@@ -1,0 +1,23 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		ShowInTaskbar="False"
+		WindowStartupLocation="CenterScreen"
+		HorizontalContentAlignment="Center">
+		<Window.Resources>
+			<Style x:Key="ClearButton" TargetType="Button">
+				<Setter Property="Background" Value="White"/>
+			</Style>
+		</Window.Resources>
+		<DockPanel Margin="10">
+			<DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+				<CheckBox Content="Соединить стены через этаж" HorizontalAlignment="Left"
+						Margin="0,0,0,0"
+						x:Name="space_calc"/>
+					
+			</DockPanel>
+			<StackPanel DockPanel.Dock="Bottom">
+				<Button x:Name="select_b" Content=""
+						Click="button_select" Margin="0,10,0,0"/>
+			</StackPanel>
+		</DockPanel>
+</Window>
