@@ -1,0 +1,12 @@
+title:
+  ru: "Квартирография\nСтадии П"
+  en_us: Rooms
+
+tooltip:
+  ru: Рассчитывает площади помещений.
+  en_us: Calculates the area of the rooms.
+
+assembly: RevitRooms.dll
+command_class: RoomsCommand
+
+author: dosymep

@@ -1,0 +1,12 @@
+title:
+  ru: "Нумератор\nпомещений и групп"
+  en_us: "Room and group\nnumbering"
+
+tooltip:
+  ru: Нумерует помещения в пределах подгрупп по заранее определенному порядку наименований помещений.
+  en_us: Numbers rooms within subgroups according to a predetermined order of room names.
+
+assembly: RevitRooms.dll
+command_class: RoomsNumsCommand
+
+author: dosymep
