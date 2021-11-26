@@ -1,0 +1,9 @@
+title:
+  ru: "Нумератор по линии"
+  en_us: "Numbering by line"
+
+tooltip:
+  ru: Нумерует помещения и паркинг по выделенной линии.
+  en_us: Numbers rooms and parking according to the selected line.
+
+author: dosymep
