@@ -209,7 +209,7 @@ class RevitRepository:
         return set(sorted([self.get_family(element) for element in elements]))
 
     def get_elements(self, category):
-        if isinstance(category, str):
+        if category and isinstance(category, str):
             category = self.get_category(category)
             return FilteredElementCollector(self.__document, self.__document.ActiveView.Id)\
                 .WhereElementIsNotElementType()\
@@ -225,21 +225,22 @@ class RevitRepository:
         return set()
 
     def get_default_param(self, category):
-        category = self.get_category(category)
-        if category.Id == ElementId(BuiltInCategory.OST_Rooms):
-            return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
+        if category:
+            category = self.get_category(category)
+            if category.Id == ElementId(BuiltInCategory.OST_Rooms):
+                return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
 
-        if category.Id == ElementId(BuiltInCategory.OST_Parking):
-            return LabelUtils.GetLabelFor(BuiltInParameter.DOOR_NUMBER)
+            if category.Id == ElementId(BuiltInCategory.OST_Parking):
+                return LabelUtils.GetLabelFor(BuiltInParameter.DOOR_NUMBER)
 
     def family_required(self, category):
-        cat = self.get_category(category)
+        if category:
+            cat = self.get_category(category)
+            if cat.Id == ElementId(BuiltInCategory.OST_Rooms):
+                return False
 
-        if cat.Id == ElementId(BuiltInCategory.OST_Rooms):
-            return False
-
-        if cat.Id == ElementId(BuiltInCategory.OST_Parking):
-            return True
+            if cat.Id == ElementId(BuiltInCategory.OST_Parking):
+                return True
 
     @staticmethod
     def get_phase(element):
