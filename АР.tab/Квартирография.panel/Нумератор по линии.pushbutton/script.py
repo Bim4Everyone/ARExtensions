@@ -1,8 +1,8 @@
 # coding=utf-8
 import clr
 
-clr.AddReference("dosymep.Revit")
-clr.AddReference("dosymep.Bim4Everyone")
+clr.AddReference("dosymep.Revit.dll")
+clr.AddReference("dosymep.Bim4Everyone.dll")
 
 import math
 import os.path as op
