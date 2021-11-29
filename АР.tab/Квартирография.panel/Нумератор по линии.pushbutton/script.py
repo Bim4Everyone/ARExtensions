@@ -211,10 +211,13 @@ class RevitRepository:
     def get_elements(self, category):
         if category and isinstance(category, str):
             category = self.get_category(category)
-            return FilteredElementCollector(self.__document, self.__document.ActiveView.Id)\
+            level_id = self.__document.ActiveView.GenLevel.Id
+            elements = FilteredElementCollector(self.__document)\
                 .WhereElementIsNotElementType()\
                 .OfCategoryId(category.Id)\
                 .ToElements()
+
+            return [element for element in elements if element.LevelId == level_id]
 
         if category == BuiltInCategory.OST_Rooms:
             return self.__room_elements
