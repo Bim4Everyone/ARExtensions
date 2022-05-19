@@ -13,11 +13,10 @@ from System.Diagnostics import Stopwatch
 from System.Windows.Input import ICommand
 from Autodesk.Revit.DB import *
 
-
 from pyrevit import forms
-from pyrevit import script
+from pyrevit import script, revit
 from pyrevit.forms import Reactive, reactive
-from pyrevit.revit import selection, Transaction
+from pyrevit.revit import selection, Transaction, HOST_APP
 
 import dosymep
 clr.ImportExtensions(dosymep.Revit)
@@ -31,7 +30,7 @@ text_debug = False
 circle_debug = False
 
 eps = 1.0e-9
-document = __revit__.ActiveUIDocument.Document
+document = __revit__.ActiveUIDocument.Document # type: Document
 
 
 def log_information(message):
@@ -78,7 +77,10 @@ def create_circle(radius, location):
 
 
 def convert_value(value):
-    return UnitUtils.ConvertToInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
+    if HOST_APP.is_older_than(2022):
+        return UnitUtils.ConvertToInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
+    else:
+        return UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Millimeters)
 
 
 def get_index_point(element, index_points):
