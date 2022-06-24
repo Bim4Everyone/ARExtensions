@@ -83,6 +83,21 @@ def convert_value(value):
         return UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Millimeters)
 
 
+def is_intersect_room(curve_element, room_element):
+    segments = room_element.GetBoundarySegments(SpatialElementBoundaryOptions())
+    segments = [segment for inner_segments in segments
+                    for segment in inner_segments]
+
+    for segment in segments:
+        curve = segment.GetCurve()
+        start = curve.GetEndPoint(0)
+        finish = curve.GetEndPoint(1)
+
+        line = Line.CreateBound(start, finish)
+        if line.Intersect(curve_element.GeometryCurve) == SetComparisonResult.Overlap:
+            return True
+
+
 def get_index_point(element, index_points):
     return next((index_point for index_point in index_points if index_point.Filter.PassesFilter(element)), None)
 
@@ -530,6 +545,8 @@ class NumerateRoomsCommand(ICommand):
 
         try:
             curve = view_model.element.Location.Curve
+            elements = [element for element in elements if is_intersect_room(view_model.element, element)]
+
             with Transaction("BIM: Нумерация по линии"):
                 index_rooms = get_index_elements(curve, elements)
                 index_rooms = sorted(index_rooms, key=lambda x: x.Index)
@@ -587,6 +604,7 @@ class SelectLineCommand(ICommand):
             self.__view_model.element = self.__revit_repository.pick_element("Выберите линию.")
         finally:
             self.__view.show_dialog()
+
 
 def execute():
     main_window = MainWindow()
