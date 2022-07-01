@@ -14,13 +14,19 @@ from System.Windows.Input import ICommand
 from Autodesk.Revit.DB import *
 
 from pyrevit import forms
-from pyrevit import script, revit
+from pyrevit import EXEC_PARAMS
 from pyrevit.forms import Reactive, reactive
 from pyrevit.revit import selection, Transaction, HOST_APP
 
 import dosymep
 clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
+
+from dosymep.Bim4Everyone.SharedParams import *
+from dosymep.Bim4Everyone.SystemParams import *
+from dosymep.Bim4Everyone.ProjectParams import *
+
+from dosymep_libs.bim4everyone import *
 
 log_debug = False
 log_point_debug = False
@@ -76,6 +82,15 @@ def create_circle(radius, location):
         return document.Create.NewDetailCurve(document.ActiveView, arc )
 
 
+def distinct(source, action):
+    seen = set()
+    for element in source:
+        action_result = action(element)
+        if not action_result in seen:
+            seen.add(action_result)
+            yield element
+
+
 def convert_value(value):
     if HOST_APP.is_older_than(2022):
         return UnitUtils.ConvertToInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
@@ -83,7 +98,7 @@ def convert_value(value):
         return UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Millimeters)
 
 
-def is_intersect_room(curve_element, room_element):
+def is_intersect_room(room_element, curve_element):
     segments = room_element.GetBoundarySegments(SpatialElementBoundaryOptions())
     segments = [segment for inner_segments in segments
                     for segment in inner_segments]
@@ -184,13 +199,18 @@ class MainWindow(forms.WPFWindow):
         self._context = None
         self.xaml_source = op.join(op.dirname(__file__), 'MainWindow.xaml')
         super(MainWindow, self).__init__(self.xaml_source)
+        self.Loaded += self.MainWindow_Loaded
 
     def ButtonOK_Click(self, sender, e):
+        self.DialogResult = True
         self.Close()
 
     def ButtonCancel_Click(self, sender, e):
+        self.DialogResult = False
         self.Close()
 
+    def MainWindow_Loaded(self, sender, event):
+        self.MinHeight = self.Height
 
 class RevitRepository:
     def __init__(self, document, ui_application):
@@ -199,6 +219,10 @@ class RevitRepository:
 
         self.__room_elements = self.get_elements(self.get_category_name(BuiltInCategory.OST_Rooms))
         self.__parking_elements = self.get_elements(self.get_category_name(BuiltInCategory.OST_Parking))
+
+    @property
+    def param_group_name(self):
+        return ProjectParamsConfig.Instance.RoomGroupName
 
     def get_category(self, category):
         return self.__document.Settings.Categories.Item[category]
@@ -224,6 +248,18 @@ class RevitRepository:
     def get_families(self, category):
         elements = self.get_elements(category)
         return set(sorted([self.get_family(element) for element in elements]))
+
+    def get_group_names(self, category):
+        elements = self.get_elements(category)
+
+        group_names = (element.GetParamValueOrDefault(self.param_group_name) for element in elements)
+        group_names = (document.GetElement(element) for element in group_names)
+        group_names = set(distinct(group_names, lambda x: x.Id))
+
+        return sorted(group_names, key=lambda x: x.Name)
+    
+    def is_group_name(self, element, group_name):
+        return element.GetParamValueOrDefault(self.param_group_name) == group_name.Id
 
     def get_elements(self, category):
         if category and isinstance(category, str):
@@ -312,6 +348,9 @@ class MainWindowViewModel(Reactive) :
         self.__family_names = []
         self.__family_name = None
 
+        self.__group_names = []
+        self.__group_name = None
+
         self.__category_names = set(self.__revit_repository.get_categories())
         self.__category_name = get_next(self.__category_names, None)
 
@@ -327,7 +366,14 @@ class MainWindowViewModel(Reactive) :
         self.family_names = self.__revit_repository.get_families(self.__category_name)
         self.family_name = get_next(self.__family_names, None)
 
+        self.group_names = self.__revit_repository.get_group_names(category)
+        self.group_name = get_next(self.__group_names, None)
+
         self.family_required = self.__revit_repository.family_required(category)
+
+    @property
+    def param_group_name(self):
+        return self.__revit_repository.param_group_name
 
     @property
     def element(self):
@@ -458,6 +504,23 @@ class MainWindowViewModel(Reactive) :
 
 
     @reactive
+    def group_names(self):
+        return self.__group_names
+
+    @group_names.setter
+    def group_names(self, value):
+        self.__group_names = value
+
+    @reactive
+    def group_name(self):
+        return self.__group_name
+
+    @group_name.setter
+    def group_name(self, value):
+        self.__group_name = value
+
+
+    @reactive
     def error_text(self):
         return self.__error_text
 
@@ -513,8 +576,9 @@ class NumerateRoomsCommand(ICommand):
             self.__view_model.error_text = "Стадия должна быть заполнена."
             return False
 
-        if not is_int(self.__view_model.start_number):
-            self.__view_model.error_text = "Начальный номер должен быть числом."
+        if not self.__view_model.group_name:
+            self.__view_model.error_text \
+                = "Параметр \"{}\" должен быть заполнен.".format(self.__view_model.param_group_name.Name)
             return False
 
         if not self.__view_model.param_name:
@@ -523,6 +587,10 @@ class NumerateRoomsCommand(ICommand):
 
         if not self.__view_model.family_name and self.__is_required_family():
             self.__view_model.error_text = "Семейство должно быть заполнено."
+            return False
+
+        if not is_int(self.__view_model.start_number):
+            self.__view_model.error_text = "Начальный номер должен быть числом."
             return False
 
         if int(self.__view_model.start_number) <= 0:
@@ -545,7 +613,9 @@ class NumerateRoomsCommand(ICommand):
 
         try:
             curve = view_model.element.Location.Curve
-            elements = [element for element in elements if is_intersect_room(view_model.element, element)]
+            elements = [element for element in elements
+                        if is_intersect_room(element, view_model.element)
+                        and self.__revit_repository.is_group_name(element, view_model.group_name)]
 
             with Transaction("BIM: Нумерация по линии"):
                 index_rooms = get_index_elements(curve, elements)
@@ -606,10 +676,13 @@ class SelectLineCommand(ICommand):
             self.__view.show_dialog()
 
 
-def execute():
+@notification()
+@log_plugin(EXEC_PARAMS.command_name)
+def script_execute(plugin_logger):
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(main_window)
-    main_window.show_dialog()
+    if not main_window.show_dialog():
+        script.exit()
 
 
-execute()
+script_execute()
