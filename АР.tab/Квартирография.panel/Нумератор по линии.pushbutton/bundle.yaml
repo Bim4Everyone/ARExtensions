@@ -1,6 +1,12 @@
 title:
-  ru: "Нумератор по линии"
-  en_us: "Numbering by line"
+  ru: >-
+    Нумератор
+    
+    по линии
+  en_us: >-
+    Numbering
+    
+    by line
 
 tooltip:
   ru: Нумерует помещения и паркинг по выделенной линии.
