@@ -253,7 +253,7 @@ class RevitRepository:
         elements = self.get_elements(category)
 
         group_names = (element.GetParamValueOrDefault(self.param_group_name) for element in elements)
-        group_names = (document.GetElement(element) for element in group_names)
+        group_names = (document.GetElement(element) for element in group_names if element.IsNotNull())
         group_names = set(distinct(group_names, lambda x: x.Id))
 
         return sorted(group_names, key=lambda x: x.Name)
