@@ -242,10 +242,6 @@ class RevitRepository:
     def is_empty(self):
         return not self.__room_elements and not self.__parking_elements
 
-    @property
-    def param_group_name(self):
-        return ProjectParamsConfig.Instance.RoomGroupName
-
     def get_category(self, category):
         return self.__document.Settings.Categories.Item[category]
 
