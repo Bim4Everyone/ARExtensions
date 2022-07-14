@@ -239,6 +239,10 @@ class RevitRepository:
         self.__parking_elements = self.get_elements(self.get_category_name(BuiltInCategory.OST_Parking))
 
     @property
+    def is_empty(self):
+        return not self.__room_elements and not self.__parking_elements
+
+    @property
     def param_group_name(self):
         return ProjectParamsConfig.Instance.RoomGroupName
 
@@ -267,25 +271,11 @@ class RevitRepository:
         elements = self.get_elements(category)
         return set(sorted([self.get_family(element) for element in elements]))
 
-    def get_group_names(self, category):
-        elements = self.get_elements(category)
-
-        group_names = (element.GetParamValueOrDefault(self.param_group_name) for element in elements)
-        group_names = (document.GetElement(element) for element in group_names if element.IsNotNull())
-        group_names = set(distinct(group_names, lambda x: x.Id))
-
-        return sorted(group_names, key=lambda x: x.Name)
-
-    def is_group_name(self, element, group_name):
-        return element.GetParamValueOrDefault(self.param_group_name) == group_name.Id
-
     def get_elements(self, category):
         if category and isinstance(category, str):
             category = self.get_category(category)
-            return FilteredElementCollector(self.__document, self.__document.ActiveView.Id) \
-                .WhereElementIsNotElementType() \
-                .OfCategoryId(category.Id) \
-                .ToElements()
+            elements = selection.get_selection().elements
+            return [element for element in elements if element.Category.Id == category.Id]
 
         if category == BuiltInCategory.OST_Rooms:
             return self.__room_elements
@@ -344,6 +334,9 @@ class MainWindowViewModel(Reactive):
         self.__element_name = None
         self.__revit_repository = RevitRepository(document, __revit__)
 
+        if self.__revit_repository.is_empty:
+            forms.alert("Выберите помещения для нумерации", exitscript=True)
+
         self.start_number = "1"
 
         self.__prefix = ""
@@ -380,9 +373,6 @@ class MainWindowViewModel(Reactive):
 
         self.family_names = self.__revit_repository.get_families(self.__category_name)
         self.family_name = get_next(self.__family_names, None)
-
-        self.group_names = self.__revit_repository.get_group_names(category)
-        self.group_name = get_next(self.__group_names, None)
 
         self.family_required = self.__revit_repository.family_required(category)
 
@@ -505,22 +495,6 @@ class MainWindowViewModel(Reactive):
         self.__family_name = value
 
     @reactive
-    def group_names(self):
-        return self.__group_names
-
-    @group_names.setter
-    def group_names(self, value):
-        self.__group_names = value
-
-    @reactive
-    def group_name(self):
-        return self.__group_name
-
-    @group_name.setter
-    def group_name(self, value):
-        self.__group_name = value
-
-    @reactive
     def error_text(self):
         return self.__error_text
 
@@ -575,11 +549,6 @@ class NumerateRoomsCommand(ICommand):
             self.__view_model.error_text = "Стадия должна быть заполнена."
             return False
 
-        if not self.__view_model.group_name:
-            self.__view_model.error_text \
-                = "Параметр \"{}\" должен быть заполнен.".format(self.__view_model.param_group_name.Name)
-            return False
-
         if not self.__view_model.param_name:
             self.__view_model.error_text = "Параметр должен быть заполнен."
             return False
@@ -613,8 +582,7 @@ class NumerateRoomsCommand(ICommand):
         try:
             curve = view_model.element.Location.Curve
             elements = [element for element in elements
-                        if is_intersect_room(element, view_model.element)
-                        and self.__revit_repository.is_group_name(element, view_model.group_name)]
+                        if is_intersect_room(element, view_model.element)]
 
             with Transaction("BIM: Нумерация по линии"):
                 index_rooms = get_index_elements(curve, elements)
