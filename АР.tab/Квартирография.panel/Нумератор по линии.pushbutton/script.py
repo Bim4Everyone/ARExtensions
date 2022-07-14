@@ -6,7 +6,7 @@ clr.AddReference("dosymep.Bim4Everyone.dll")
 
 import math
 import os.path as op
-import pyevent #pylint: disable=import-error
+import pyevent  # pylint: disable=import-error
 
 import System
 from System.Diagnostics import Stopwatch
@@ -36,20 +36,23 @@ text_debug = False
 circle_debug = False
 
 eps = 1.0e-9
-document = __revit__.ActiveUIDocument.Document # type: Document
+document = __revit__.ActiveUIDocument.Document  # type: Document
 
 
 def log_information(message):
     if log_debug:
         print message
 
+
 def log_point(message):
     if log_point_debug:
         print message
 
+
 def log_elapsed_time(message):
     if log_elapsed_time_debug:
         print message
+
 
 def get_next(enumerable, default):
     return next((e for e in enumerable), default)
@@ -62,11 +65,12 @@ def is_int(value):
     except:
         return False
 
+
 def create_text(text, location):
     if text_debug:
         options = TextNoteOptions()
         options.Rotation = 0
-        #options.TypeId = ElementId(27712)
+        # options.TypeId = ElementId(27712)
         options.TypeId = ElementId(366012)
         options.VerticalAlignment = VerticalTextAlignment.Middle
         options.HorizontalAlignment = HorizontalTextAlignment.Center
@@ -79,7 +83,7 @@ def create_circle(radius, location):
         plane = Plane.CreateByNormalAndOrigin(XYZ.BasisZ, location)
         arc = Arc.Create(plane, radius, 0, 2 * math.pi)
 
-        return document.Create.NewDetailCurve(document.ActiveView, arc )
+        return document.Create.NewDetailCurve(document.ActiveView, arc)
 
 
 def distinct(source, action):
@@ -101,12 +105,17 @@ def convert_value(value):
 def is_intersect_room(room_element, curve_element):
     segments = room_element.GetBoundarySegments(SpatialElementBoundaryOptions())
     segments = [segment for inner_segments in segments
-                    for segment in inner_segments]
+                for segment in inner_segments]
 
     for segment in segments:
         curve = segment.GetCurve()
+
         start = curve.GetEndPoint(0)
         finish = curve.GetEndPoint(1)
+
+        point = curve_element.GeometryCurve.GetEndPoint(0)
+        start = XYZ(start.X, start.Y, point.Z)
+        finish = XYZ(finish.X, finish.Y, point.Z)
 
         line = Line.CreateBound(start, finish)
         if line.Intersect(curve_element.GeometryCurve) == SetComparisonResult.Overlap:
@@ -114,7 +123,7 @@ def is_intersect_room(room_element, curve_element):
 
 
 def get_index_point(element, index_points):
-    return next((index_point for index_point in index_points if index_point.Filter.PassesFilter(element)), None)
+    return next((index_point for index_point in index_points if index_point.PassesFilter(element)), None)
 
 
 def get_index_points(curve):
@@ -130,7 +139,7 @@ def get_index_points(curve):
     points = curve.Tessellate()
     current_point = curve.GetEndPoint(0)
 
-    index  = 0
+    index = 0
     create_text(index, current_point)
 
     for point in points:
@@ -189,13 +198,21 @@ class IndexElement:
 
 
 class IndexElementPoint(IndexElement):
-    def __init__(self, index, element):
-        IndexElement.__init__(self, index, element)
-        self.Filter = BoundingBoxContainsPointFilter(element)
+    def __init__(self, index, point):
+        IndexElement.__init__(self, index, point)
+
+    def PassesFilter(self, element):
+        bb = element.get_BoundingBox(None)
+        if bb:
+            point = XYZ(self.Element.X, self.Element.Y, bb.Min.Z)
+        else:
+            point = XYZ(self.Element.X, self.Element.Y, element.Location.Point.Z)
+
+        return BoundingBoxContainsPointFilter(point).PassesFilter(element)
 
 
 class MainWindow(forms.WPFWindow):
-    def __init__(self,):
+    def __init__(self, ):
         self._context = None
         self.xaml_source = op.join(op.dirname(__file__), 'MainWindow.xaml')
         super(MainWindow, self).__init__(self.xaml_source)
@@ -211,6 +228,7 @@ class MainWindow(forms.WPFWindow):
 
     def MainWindow_Loaded(self, sender, event):
         self.MinHeight = self.Height
+
 
 class RevitRepository:
     def __init__(self, document, ui_application):
@@ -257,20 +275,17 @@ class RevitRepository:
         group_names = set(distinct(group_names, lambda x: x.Id))
 
         return sorted(group_names, key=lambda x: x.Name)
-    
+
     def is_group_name(self, element, group_name):
         return element.GetParamValueOrDefault(self.param_group_name) == group_name.Id
 
     def get_elements(self, category):
         if category and isinstance(category, str):
             category = self.get_category(category)
-            level_id = self.__document.ActiveView.GenLevel.Id
-            elements = FilteredElementCollector(self.__document)\
-                .WhereElementIsNotElementType()\
-                .OfCategoryId(category.Id)\
+            return FilteredElementCollector(self.__document, self.__document.ActiveView.Id) \
+                .WhereElementIsNotElementType() \
+                .OfCategoryId(category.Id) \
                 .ToElements()
-
-            return [element for element in elements if element.LevelId == level_id]
 
         if category == BuiltInCategory.OST_Rooms:
             return self.__room_elements
@@ -321,7 +336,7 @@ class RevitRepository:
             return selection.pick_element(title)
 
 
-class MainWindowViewModel(Reactive) :
+class MainWindowViewModel(Reactive):
     def __init__(self, view, *args):
         Reactive.__init__(self, *args)
 
@@ -384,7 +399,6 @@ class MainWindowViewModel(Reactive) :
         self.__curve = value
         self.element_name = "{} ({})".format(str(self.__curve.Id.IntegerValue), self.__curve.Category.Name) if self.__curve else None
 
-
     @reactive
     def element_name(self):
         return self.__element_name
@@ -392,7 +406,6 @@ class MainWindowViewModel(Reactive) :
     @element_name.setter
     def element_name(self, value):
         self.__element_name = value
-
 
     @reactive
     def family_required(self):
@@ -402,7 +415,6 @@ class MainWindowViewModel(Reactive) :
     def family_required(self, value):
         self.__family_required = value
 
-
     @reactive
     def category_names(self):
         return self.__category_names
@@ -410,7 +422,6 @@ class MainWindowViewModel(Reactive) :
     @category_names.setter
     def category_names(self, value):
         self.__category_names = value
-
 
     @reactive
     def category_name(self):
@@ -421,7 +432,6 @@ class MainWindowViewModel(Reactive) :
         self.__category_name = value
         self.OnUpdateCategory(self.__category_name)
 
-
     @reactive
     def phase_names(self):
         return self.__phase_names
@@ -429,7 +439,6 @@ class MainWindowViewModel(Reactive) :
     @phase_names.setter
     def phase_names(self, value):
         self.__phase_names = value
-
 
     @reactive
     def phase_name(self):
@@ -439,7 +448,6 @@ class MainWindowViewModel(Reactive) :
     def phase_name(self, value):
         self.__phase_name = value
 
-
     @reactive
     def start_number(self):
         return self.__start_number
@@ -447,7 +455,6 @@ class MainWindowViewModel(Reactive) :
     @start_number.setter
     def start_number(self, value):
         self.__start_number = value
-
 
     @reactive
     def prefix(self):
@@ -457,7 +464,6 @@ class MainWindowViewModel(Reactive) :
     def prefix(self, value):
         self.__prefix = value
 
-
     @reactive
     def suffix(self):
         return self.__suffix
@@ -465,7 +471,6 @@ class MainWindowViewModel(Reactive) :
     @suffix.setter
     def suffix(self, value):
         self.__suffix = value
-
 
     @reactive
     def param_names(self):
@@ -475,7 +480,6 @@ class MainWindowViewModel(Reactive) :
     def param_names(self, value):
         self.__param_names = value
 
-
     @reactive
     def param_name(self):
         return self.__param_name
@@ -483,7 +487,6 @@ class MainWindowViewModel(Reactive) :
     @param_name.setter
     def param_name(self, value):
         self.__param_name = value
-
 
     @reactive
     def family_names(self):
@@ -493,7 +496,6 @@ class MainWindowViewModel(Reactive) :
     def family_names(self, value):
         self.__family_names = value
 
-
     @reactive
     def family_name(self):
         return self.__family_name
@@ -501,7 +503,6 @@ class MainWindowViewModel(Reactive) :
     @family_name.setter
     def family_name(self, value):
         self.__family_name = value
-
 
     @reactive
     def group_names(self):
@@ -519,7 +520,6 @@ class MainWindowViewModel(Reactive) :
     def group_name(self, value):
         self.__group_name = value
 
-
     @reactive
     def error_text(self):
         return self.__error_text
@@ -527,7 +527,6 @@ class MainWindowViewModel(Reactive) :
     @error_text.setter
     def error_text(self, value):
         self.__error_text = value
-
 
     @property
     def numerate_command(self):
@@ -606,7 +605,7 @@ class NumerateRoomsCommand(ICommand):
 
         view_model = self.__view_model
         elements = self.__revit_repository.get_elements(view_model.category_name)
-        elements = [element for element in elements if self.__get_phase_name(element) == view_model.phase_name ]
+        elements = [element for element in elements if self.__get_phase_name(element) == view_model.phase_name]
 
         if self.__family_required(view_model.category_name):
             elements = [element for element in elements if self.__get_family(element) == view_model.family_name]
@@ -632,7 +631,6 @@ class NumerateRoomsCommand(ICommand):
         finally:
             stopwatch.Stop()
             log_elapsed_time("Operations Elapsed: {}".format(stopwatch.Elapsed))
-
 
     def __is_required_family(self):
         return self.__revit_repository.family_required(self.__view_model.category_name)
