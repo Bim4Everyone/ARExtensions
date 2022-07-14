@@ -235,6 +235,9 @@ class RevitRepository:
         self.__document = document
         self.__application = ui_application
 
+        self.__elements = [element for element in selection.get_selection().elements
+            if element.LevelId == document.ActiveView.GenLevel.Id]
+
         self.__room_elements = self.get_elements(self.get_category_name(BuiltInCategory.OST_Rooms))
         self.__parking_elements = self.get_elements(self.get_category_name(BuiltInCategory.OST_Parking))
 
@@ -270,8 +273,7 @@ class RevitRepository:
     def get_elements(self, category):
         if category and isinstance(category, str):
             category = self.get_category(category)
-            elements = selection.get_selection().elements
-            return [element for element in elements if element.Category.Id == category.Id]
+            return [element for element in self.__elements if element.Category.Id == category.Id]
 
         if category == BuiltInCategory.OST_Rooms:
             return self.__room_elements
@@ -352,9 +354,6 @@ class MainWindowViewModel(Reactive):
         self.__family_names = []
         self.__family_name = None
 
-        self.__group_names = []
-        self.__group_name = None
-
         self.__category_names = set(self.__revit_repository.get_categories())
         self.__category_name = get_next(self.__category_names, None)
 
@@ -371,10 +370,6 @@ class MainWindowViewModel(Reactive):
         self.family_name = get_next(self.__family_names, None)
 
         self.family_required = self.__revit_repository.family_required(category)
-
-    @property
-    def param_group_name(self):
-        return self.__revit_repository.param_group_name
 
     @property
     def element(self):
