@@ -1,0 +1,15 @@
+title:
+  ru: >-
+    Нумератор
+    
+    по диагонали
+  en_us: >-
+    Diagonal
+    
+    Numbering
+
+tooltip:
+  ru: Нумерует выделенные помещения по заданному направлению.
+  en_us: Numbers selected rooms by direction.
+
+author: sssenya
