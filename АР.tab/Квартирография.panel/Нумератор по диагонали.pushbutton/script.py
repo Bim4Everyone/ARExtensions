@@ -38,7 +38,10 @@ class GeometryRoom:
         self.range = self.x * self.direction.X - self.y * self.direction.Y
 
     def set_num(self, num):
-        self.obj.SetParamValue("Номер", num)
+        self.obj.SetParamValue(BuiltInParameter.ROOM_NUMBER, num)
+
+    def get_num(self):
+        return self.obj.Number
 
 
 class NumerateInfo:
@@ -71,7 +74,7 @@ class RoomsNumerator:
                 if not room.obj.GetParamValue(ProjectParamsConfig.Instance.IsRoomNumberFix):
                     self.rooms_to_num.append(room)
                 else:
-                    self.placed_number.append(room.obj.GetParamValue("Номер"))
+                    self.placed_number.append(room.get_num())
         else:
             self.rooms_to_num = rooms
 
@@ -96,8 +99,7 @@ def script_execute(plugin_logger):
     selection = [doc.GetElement(i) for i in selection_ids]
     rooms = [x for x in selection if isinstance(x, Room)]
     if not rooms:
-        forms.alert("Необходимо выбрать помещения!")
-        raise SystemExit(1)
+        forms.alert("Необходимо выбрать помещения!", exitscript=True)
 
     form = RenumerateVectorForm()
     result = form.ShowDialog()
