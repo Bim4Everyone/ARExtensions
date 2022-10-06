@@ -8,8 +8,8 @@ clr.AddReference("FormsCollector")
 from FormsCollector import RenumerateVectorForm
 
 clr.AddReference("System.Windows.Forms")
-from System.Windows.Forms import MessageBox
 
+from pyrevit import forms
 from pyrevit import EXEC_PARAMS
 
 from Autodesk.Revit.DB.Architecture import Room
@@ -22,6 +22,7 @@ clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
 
 from dosymep_libs.bim4everyone import *
+from dosymep.Bim4Everyone.ProjectParams import *
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -37,34 +38,55 @@ class GeometryRoom:
         self.range = self.x * self.direction.X - self.y * self.direction.Y
 
     def set_num(self, num):
-        self.obj.Parameter[BuiltInParameter.ROOM_NUMBER].Set(num)
+        self.obj.SetParamValue("Номер", num)
 
 
-def renumber_rooms(rooms_revit, start, suffix, prefix, direction):
-    fix_param = "Speech_Фиксация номера пом."
+class NumerateInfo:
+    def __init__(self, form):
+        self.start = form.Result.Start
+        self.suffix = form.Result.Suffix
+        self.prefix = form.Result.Prefix
+        self.direction = form.Result.Direction
 
-    placed_number = []
-    rooms_to_num = []
-    rooms = [GeometryRoom(x, direction) for x in rooms_revit]
 
-    if rooms[0].obj.LookupParameter(fix_param):
-        for room in rooms:
-            if room.obj.LookupParameter(fix_param).AsInteger() == 0:
-                rooms_to_num.append(room)
-            else:
-                placed_number.append(room.obj.Parameter[BuiltInParameter.ROOM_NUMBER].AsString())
+class RoomsNumerator:
+    def __init__(self, renumerate_info, rooms):
+        self.start = renumerate_info.start
+        self.suffix = renumerate_info.suffix
+        self.prefix = renumerate_info.prefix
+        self.direction = renumerate_info.direction
+        self.rooms_revit = rooms
 
-    rooms_to_num.sort(key=lambda k: k.range)
+        self.placed_number = []
+        self.rooms_to_num = []
 
-    with Transaction("BIM: Нумерация по диагонали"):
-        for i in range(len(rooms_to_num)):
-            number = start + i
-            while str(number) in placed_number:
-                number += 1
-            number = str(number)
-            placed_number.append(number)
-            name = "{}{}{}".format(prefix, number, suffix)
-            rooms_to_num[i].set_num(name)
+        self.__sort_rooms()
+        self.__renumber_rooms()
+
+    def __sort_rooms(self):
+        rooms = [GeometryRoom(x, self.direction) for x in self.rooms_revit]
+
+        if doc.IsExistsParam(ProjectParamsConfig.Instance.IsRoomNumberFix):
+            for room in rooms:
+                if not room.obj.GetParamValue(ProjectParamsConfig.Instance.IsRoomNumberFix):
+                    self.rooms_to_num.append(room)
+                else:
+                    self.placed_number.append(room.obj.GetParamValue("Номер"))
+        else:
+            self.rooms_to_num = rooms
+
+        self.rooms_to_num.sort(key=lambda k: k.range)
+
+    def __renumber_rooms(self):
+        with Transaction("BIM: Нумерация по диагонали"):
+            for i, room in enumerate(self.rooms_to_num):
+                number = self.start + i
+                while str(number) in self.placed_number:
+                    number += 1
+                number = str(number)
+                self.placed_number.append(number)
+                name = "{}{}{}".format(self.prefix, number, self.suffix)
+                room.set_num(name)
 
 
 @notification()
@@ -74,7 +96,7 @@ def script_execute(plugin_logger):
     selection = [doc.GetElement(i) for i in selection_ids]
     rooms = [x for x in selection if isinstance(x, Room)]
     if not rooms:
-        MessageBox.Show("Необходимо выбрать помещения!")
+        forms.alert("Необходимо выбрать помещения!")
         raise SystemExit(1)
 
     form = RenumerateVectorForm()
@@ -82,12 +104,9 @@ def script_execute(plugin_logger):
     if not result:
         raise SystemExit(1)
 
-    start = form.Result.Start
-    suffix = form.Result.Suffix
-    prefix = form.Result.Prefix
-    direction = form.Result.Direction
+    numerate_info = NumerateInfo(form)
 
-    renumber_rooms(rooms, start, suffix, prefix, direction)
+    RoomsNumerator(numerate_info, rooms)
 
 
 script_execute()
