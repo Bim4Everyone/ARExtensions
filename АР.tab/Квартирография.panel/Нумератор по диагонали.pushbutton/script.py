@@ -63,24 +63,19 @@ class RoomsNumerator:
         self.placed_number = []
         self.rooms_to_num = []
 
-        self.__sort_rooms()
-        self.__renumber_rooms()
-
     def __sort_rooms(self):
         rooms = [GeometryRoom(x, self.direction) for x in self.rooms_revit]
 
-        if doc.IsExistsParam(ProjectParamsConfig.Instance.IsRoomNumberFix):
-            for room in rooms:
-                if room.obj.GetParamValue(ProjectParamsConfig.Instance.IsRoomNumberFix):
-                    self.placed_number.append(room.get_num())
-                else:
-                    self.rooms_to_num.append(room)
-        else:
-            self.rooms_to_num = rooms
+        for room in rooms:
+            if room.obj.GetParamValueOrDefault(ProjectParamsConfig.Instance.IsRoomNumberFix):
+                self.placed_number.append(room.get_num())
+            else:
+                self.rooms_to_num.append(room)
 
         self.rooms_to_num.sort(key=lambda k: k.range)
 
-    def __renumber_rooms(self):
+    def renumber_rooms(self):
+        self.__sort_rooms()
         with Transaction("BIM: Нумерация по диагонали"):
             for i, room in enumerate(self.rooms_to_num):
                 number = self.start + i
@@ -108,7 +103,8 @@ def script_execute(plugin_logger):
 
     numerate_info = NumerateInfo(form)
 
-    RoomsNumerator(numerate_info, rooms)
+    rooms_numerator = RoomsNumerator(numerate_info, rooms)
+    rooms_numerator.renumber_rooms()
 
 
 script_execute()
