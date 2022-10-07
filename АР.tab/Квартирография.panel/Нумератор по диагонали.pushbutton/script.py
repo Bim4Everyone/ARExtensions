@@ -38,7 +38,7 @@ class GeometryRoom:
         self.range = self.x * self.direction.X - self.y * self.direction.Y
 
     def set_num(self, num):
-        self.obj.SetParamValue(BuiltInParameter.ROOM_NUMBER, num)
+        self.obj.Number = num
 
     def get_num(self):
         return self.obj.Number
@@ -71,10 +71,10 @@ class RoomsNumerator:
 
         if doc.IsExistsParam(ProjectParamsConfig.Instance.IsRoomNumberFix):
             for room in rooms:
-                if not room.obj.GetParamValue(ProjectParamsConfig.Instance.IsRoomNumberFix):
-                    self.rooms_to_num.append(room)
-                else:
+                if room.obj.GetParamValue(ProjectParamsConfig.Instance.IsRoomNumberFix):
                     self.placed_number.append(room.get_num())
+                else:
+                    self.rooms_to_num.append(room)
         else:
             self.rooms_to_num = rooms
 
