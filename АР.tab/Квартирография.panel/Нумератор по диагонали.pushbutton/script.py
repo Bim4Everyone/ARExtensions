@@ -9,7 +9,7 @@ from FormsCollector import RenumerateVectorForm
 
 clr.AddReference("System.Windows.Forms")
 
-from pyrevit import forms
+from pyrevit.forms import *
 from pyrevit import EXEC_PARAMS
 
 from Autodesk.Revit.DB.Architecture import Room
@@ -26,6 +26,26 @@ from dosymep.Bim4Everyone.ProjectParams import *
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
+
+
+class MainWindow(WPFWindow):
+    def __init__(self, groups):
+        self._context = None
+        self.xaml_source = op.join(op.dirname(__file__), 'MainWindow.xaml')
+        super(MainWindow, self).__init__(self.xaml_source)
+
+        self.RoomGroups.ItemsSource = groups
+        self.selected_groups = None
+
+    def filter_groups(self, sender, args):
+        self.selected_groups = [x.Name for x in self.RoomGroups.Items if x.IsChecked]
+        self.Close()
+
+
+class RoomGroup:
+    def __init__(self, group):
+        self.Name = group
+        self.IsChecked = True
 
 
 class GeometryRoom:
@@ -94,17 +114,33 @@ def script_execute(plugin_logger):
     selection = [doc.GetElement(i) for i in selection_ids]
     rooms = [x for x in selection if isinstance(x, Room)]
     if not rooms:
-        forms.alert("Необходимо выбрать помещения!", exitscript=True)
+        alert("Необходимо выбрать помещения!", exitscript=True)
 
-    form = RenumerateVectorForm()
-    result = form.ShowDialog()
-    if not result:
-        raise SystemExit(1)
+    group_param = ProjectParamsConfig.Instance.RoomGroupName
+    groups = {doc.GetElement(r.GetParamValueOrDefault(group_param)).Name for r in rooms}
+    groups = sorted(groups)
+    groups = {RoomGroup(x) for x in groups}
 
-    numerate_info = NumerateInfo(form)
+    main_window = MainWindow(groups)
+    main_window.show_dialog()
+    filtered_groups = main_window.selected_groups
 
-    rooms_numerator = RoomsNumerator(numerate_info, rooms)
-    rooms_numerator.renumber_rooms()
+    if filtered_groups:
+        filtered_rooms = []
+        for room in rooms:
+            if doc.GetElement(room.GetParamValueOrDefault(group_param)).Name in filtered_groups:
+                filtered_rooms.append(room)
+
+        if filtered_rooms:
+            form = RenumerateVectorForm()
+            result = form.ShowDialog()
+            if not result:
+                raise SystemExit(1)
+
+            numerate_info = NumerateInfo(form)
+
+            rooms_numerator = RoomsNumerator(numerate_info, filtered_rooms)
+            rooms_numerator.renumber_rooms()
 
 
 script_execute()
