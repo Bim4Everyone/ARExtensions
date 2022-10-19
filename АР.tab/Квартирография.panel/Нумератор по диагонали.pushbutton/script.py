@@ -70,19 +70,27 @@ class RoomGroup:
 
 
 class GeometryRoom:
-    def __init__(self, obj, direction):
+    def __init__(self, obj):
         self.x = obj.Location.Point.X
         self.y = obj.Location.Point.Y
         self.obj = obj
-        self.direction = direction
-
-        self.range = self.x * self.direction.X - self.y * self.direction.Y
+        self.group_param = ProjectParamsConfig.Instance.RoomGroupName
 
     def set_num(self, num):
         self.obj.Number = num
 
     def get_num(self):
         return self.obj.Number
+
+    def get_group(self):
+        group = doc.GetElement(self.obj.GetParamValueOrDefault(self.group_param))
+        if group:
+            return group.Name
+        else:
+            return "<Без группы>"
+
+    def get_range(self, direction):
+        return self.x * direction.X - self.y * direction.Y
 
 
 class NumerateInfo:
@@ -105,7 +113,7 @@ class RoomsNumerator:
         self.rooms_to_num = []
 
     def __sort_rooms(self):
-        rooms = [GeometryRoom(x, self.direction) for x in self.rooms_revit]
+        rooms = [x for x in self.rooms_revit]
 
         for room in rooms:
             if room.obj.GetParamValueOrDefault(ProjectParamsConfig.Instance.IsRoomNumberFix):
@@ -113,7 +121,7 @@ class RoomsNumerator:
             else:
                 self.rooms_to_num.append(room)
 
-        self.rooms_to_num.sort(key=lambda k: k.range)
+        self.rooms_to_num.sort(key=lambda k: k.get_range(self.direction))
 
     def renumber_rooms(self):
         self.__sort_rooms()
@@ -133,12 +141,11 @@ class RoomsNumerator:
 def script_execute(plugin_logger):
     selection_ids = uidoc.Selection.GetElementIds()
     selection = [doc.GetElement(i) for i in selection_ids]
-    rooms = [x for x in selection if isinstance(x, Room)]
+    rooms = [GeometryRoom(x) for x in selection if isinstance(x, Room)]
     if not rooms:
         alert("Необходимо выбрать помещения!", exitscript=True)
 
-    group_param = ProjectParamsConfig.Instance.RoomGroupName
-    groups = {doc.GetElement(r.GetParamValueOrDefault(group_param)).Name for r in rooms}
+    groups = {r.get_group() for r in rooms}
     groups = sorted(groups)
     groups = {RoomGroup(x) for x in groups}
 
@@ -146,22 +153,24 @@ def script_execute(plugin_logger):
     main_window.show_dialog()
     filtered_groups = main_window.selected_groups
 
+    filtered_rooms = []
     if filtered_groups:
-        filtered_rooms = []
         for room in rooms:
-            if doc.GetElement(room.GetParamValueOrDefault(group_param)).Name in filtered_groups:
+            if room.get_group() in filtered_groups:
                 filtered_rooms.append(room)
+    else:
+        raise SystemExit(1)
 
-        if filtered_rooms:
-            form = RenumerateVectorForm()
-            result = form.ShowDialog()
-            if not result:
-                raise SystemExit(1)
+    if filtered_rooms:
+        form = RenumerateVectorForm()
+        result = form.ShowDialog()
+        if not result:
+            raise SystemExit(1)
 
-            numerate_info = NumerateInfo(form)
+        numerate_info = NumerateInfo(form)
 
-            rooms_numerator = RoomsNumerator(numerate_info, filtered_rooms)
-            rooms_numerator.renumber_rooms()
+        rooms_numerator = RoomsNumerator(numerate_info, filtered_rooms)
+        rooms_numerator.renumber_rooms()
 
 
 script_execute()
