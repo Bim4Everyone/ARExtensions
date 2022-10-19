@@ -38,35 +38,36 @@ class MainWindow(WPFWindow):
         self.selected_groups = None
 
     def filter_groups(self, sender, args):
-        self.selected_groups = [x.Name for x in self.RoomGroups.Items if x.IsChecked]
+        self.selected_groups = [x.name for x in self.RoomGroups.Items if x.is_checked]
         self.Close()
 
-    def select_all(self, sender, args):
-        new_items = []
+    def update_states(self, value):
         for group in self.RoomGroups.ItemsSource:
-            group.IsChecked = True
-            new_items.append(group)
-        self.RoomGroups.ItemsSource = new_items
+            group.is_checked = value
+
+    def select_all(self, sender, args):
+        self.update_states(True)
 
     def deselect_all(self, sender, args):
-        new_items = []
-        for group in self.RoomGroups.ItemsSource:
-            group.IsChecked = False
-            new_items.append(group)
-        self.RoomGroups.ItemsSource = new_items
+        self.update_states(False)
 
     def invert(self, sender, args):
-        new_items = []
         for group in self.RoomGroups.ItemsSource:
-            group.IsChecked = not(group.IsChecked)
-            new_items.append(group)
-        self.RoomGroups.ItemsSource = new_items
+            group.is_checked = not (group.is_checked)
 
 
-class RoomGroup:
+class RoomGroup(Reactive):
     def __init__(self, group):
-        self.Name = group
-        self.IsChecked = True
+        self.name = group
+        self.__is_checked = True
+
+    @reactive
+    def is_checked(self):
+        return self.__is_checked
+
+    @is_checked.setter
+    def is_checked(self, value):
+        self.__is_checked = value
 
 
 class GeometryRoom:
@@ -83,11 +84,11 @@ class GeometryRoom:
         return self.obj.Number
 
     def get_group(self):
-        group = doc.GetElement(self.obj.GetParamValueOrDefault(self.group_param))
-        if group:
-            return group.Name
-        else:
-            return "<Без группы>"
+        if self.obj.GetParamValueOrDefault(self.group_param):
+            group = doc.GetElement(self.obj.GetParamValueOrDefault(self.group_param))
+            if group:
+                return group.Name
+        return "<Без группы>"
 
     def get_range(self, direction):
         return self.x * direction.X - self.y * direction.Y
@@ -159,13 +160,13 @@ def script_execute(plugin_logger):
             if room.get_group() in filtered_groups:
                 filtered_rooms.append(room)
     else:
-        raise SystemExit(1)
+        script.exit()
 
     if filtered_rooms:
         form = RenumerateVectorForm()
         result = form.ShowDialog()
         if not result:
-            raise SystemExit(1)
+            script.exit()
 
         numerate_info = NumerateInfo(form)
 

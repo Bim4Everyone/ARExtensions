@@ -6,7 +6,7 @@
              Title="Группы помещений"
              mc:Ignorable="d"
              WindowStartupLocation="CenterScreen"
-             Width="350" Height="400">
+             Width="500" Height="400">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="25"/>
@@ -33,7 +33,7 @@
             x:Name="RoomGroups">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsChecked}"/>
+                    <CheckBox Content="{Binding name}" IsChecked="{Binding is_checked}"/>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
