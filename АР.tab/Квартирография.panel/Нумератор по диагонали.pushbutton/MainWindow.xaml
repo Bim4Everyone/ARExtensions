@@ -12,15 +12,23 @@
             <RowDefinition Height="25"/>
             <RowDefinition/>
             <RowDefinition Height="40"/>
+            <RowDefinition Height="40"/>
         </Grid.RowDefinitions>
-        
-        <TextBlock 
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock
             Grid.Row="0"
-            Text="Необходимо выбрать группы помещений для нумерации" 
+            Grid.ColumnSpan="3"
+            Text="Необходимо выбрать группы помещений для нумерации"
             Margin="10,5,10,0"/>
 
-        <ListBox 
+        <ListBox
             Grid.Row="1"
+            Grid.ColumnSpan="3"
             Margin="10,5"
             x:Name="RoomGroups">
             <ListBox.ItemTemplate>
@@ -29,9 +37,31 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
-        
-        <Button 
+
+        <Button
             Grid.Row="2"
+            Grid.Column="0"
+            Click="select_all"
+            Content="Выделить все"
+            Margin="10,5,10,5"/>
+
+        <Button
+            Grid.Row="2"
+            Grid.Column="1"
+            Click="deselect_all"
+            Content="Снять выбор"
+            Margin="10,5,10,5"/>
+
+        <Button
+            Grid.Row="2"
+            Grid.Column="2"
+            Click="invert"
+            Content="Инвертировать"
+            Margin="10,5,10,5"/>
+
+        <Button
+            Grid.Row="3"
+            Grid.ColumnSpan="3"
             Click="filter_groups"
             Content="Выбрать" 
             Margin="10,5,10,10"/>

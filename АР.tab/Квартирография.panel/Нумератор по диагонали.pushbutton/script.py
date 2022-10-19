@@ -41,6 +41,27 @@ class MainWindow(WPFWindow):
         self.selected_groups = [x.Name for x in self.RoomGroups.Items if x.IsChecked]
         self.Close()
 
+    def select_all(self, sender, args):
+        new_items = []
+        for group in self.RoomGroups.ItemsSource:
+            group.IsChecked = True
+            new_items.append(group)
+        self.RoomGroups.ItemsSource = new_items
+
+    def deselect_all(self, sender, args):
+        new_items = []
+        for group in self.RoomGroups.ItemsSource:
+            group.IsChecked = False
+            new_items.append(group)
+        self.RoomGroups.ItemsSource = new_items
+
+    def invert(self, sender, args):
+        new_items = []
+        for group in self.RoomGroups.ItemsSource:
+            group.IsChecked = not(group.IsChecked)
+            new_items.append(group)
+        self.RoomGroups.ItemsSource = new_items
+
 
 class RoomGroup:
     def __init__(self, group):
