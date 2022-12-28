@@ -15,7 +15,6 @@ from pyrevit import *
 from pyrevit.forms import *
 from pyrevit.revit import *
 
-from Autodesk.Revit.DB.Architecture import Room
 from Autodesk.Revit.DB import *
 
 import dosymep
@@ -24,9 +23,18 @@ clr.ImportExtensions(dosymep.Bim4Everyone)
 
 from dosymep_libs.bim4everyone import *
 from dosymep.Bim4Everyone.ProjectParams import *
+from dosymep.Bim4Everyone.KeySchedules import *
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
+
+
+def is_float(value):
+    try:
+        float(value)
+        return True
+    except:
+        return False
 
 
 class MainWindow(WPFWindow):
@@ -77,6 +85,14 @@ class MainWindowViewModel(Reactive):
     def is_open(self, value):
         self.__is_open = value
 
+    @reactive
+    def error_text(self):
+        return self.__error_text
+
+    @error_text.setter
+    def error_text(self, value):
+        self.__error_text = value
+
 
 class AddNewNameCommand(ICommand):
     CanExecuteChanged, _canExecuteChanged = pyevent.make_event()
@@ -84,11 +100,13 @@ class AddNewNameCommand(ICommand):
     def __init__(self, view_model, *args):
         ICommand.__init__(self, *args)
         self.__view_model = view_model
+        self.__view_model.PropertyChanged += self.ViewModel_PropertyChanged
 
         self.__view_model.room_name = ""
-        self.__view_model.coefficient = 1
+        self.__view_model.coefficient = "1"
         self.__view_model.is_summer = False
-        self.__view_model.is_open = False
+        self.__view_model.is_living = False
+        self.__error_text = ""
 
     def add_CanExecuteChanged(self, value):
         self.CanExecuteChanged += value
@@ -96,15 +114,26 @@ class AddNewNameCommand(ICommand):
     def remove_CanExecuteChanged(self, value):
         self.CanExecuteChanged -= value
 
+    def ViewModel_PropertyChanged(self, sender, e):
+        self.OnCanExecuteChanged()
+
     def OnCanExecuteChanged(self):
         self._canExecuteChanged(self, System.EventArgs.Empty)
 
     def CanExecute(self, parameter):
+        if not self.__view_model.room_name or not self.__view_model.coefficient:
+            self.__view_model.error_text = "Заполните все поля."
+            return False
+
+        if not is_float(self.__view_model.coefficient):
+            self.__view_model.error_text = "Коэффициент должен быть числом."
+            return False
+
+        self.__view_model.error_text = None
         return True
 
     def Execute(self, parameter):
-        #print(str(self.__view_model.is_open))
-        names_schedule = find_schedule(doc, "КВГ_(Ключ.) - Наименование пом.")
+        names_schedule = find_schedule(doc, KeySchedulesConfig.Instance.RoomsNames.ScheduleName)
         table_data = names_schedule.GetTableData()
         section_data = table_data.GetSectionData(SectionType.Body)
 
@@ -119,10 +148,12 @@ class AddNewNameCommand(ICommand):
             new_key_id = [x for x in keys_after if x not in keys_before][0]
             new_key = doc.GetElement(ElementId(new_key_id))
 
-            new_key.LookupParameter("Ключевое имя").Set(self.__view_model.room_name)
+            new_key.SetParamValue(BuiltInParameter.REF_TABLE_ELEM_NAME, self.__view_model.room_name)
+            new_key.SetParamValue(BuiltInParameter.ROOM_NAME, self.__view_model.room_name)
             new_key.LookupParameter("ФОП_Коэффициент площади").Set(float(self.__view_model.coefficient))
-            new_key.LookupParameter("КВГ_Летнее").Set(self.__view_model.is_summer)
-            new_key.LookupParameter("КВГ_Жилое").Set(self.__view_model.is_open)
+            #new_key.SetParamValue(ProjectParamsConfig.Instance.RoomAreaRatio, self.__view_model.coefficient)
+            new_key.SetParamValue(ProjectParamsConfig.Instance.IsRoomBalcony, self.__view_model.is_summer)
+            new_key.SetParamValue(ProjectParamsConfig.Instance.IsRoomLiving, self.__view_model.is_living)
 
             t.Commit()
 
@@ -152,7 +183,6 @@ def get_keys_from_schedule(schedule):
 def script_execute(plugin_logger):
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel()
-
 
     if not main_window.show_dialog():
         script.exit()
