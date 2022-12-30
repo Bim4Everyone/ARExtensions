@@ -78,12 +78,12 @@ class MainWindowViewModel(Reactive):
         self.__is_summer = value
 
     @reactive
-    def is_open(self):
-        return self.__is_open
+    def is_living(self):
+        return self.__is_living
 
-    @is_open.setter
-    def is_open(self, value):
-        self.__is_open = value
+    @is_living.setter
+    def is_living(self, value):
+        self.__is_living = value
 
     @reactive
     def error_text(self):
@@ -157,6 +157,8 @@ class AddNewNameCommand(ICommand):
 
             t.Commit()
 
+        return True
+
 
 def find_schedule(doc, name):
     schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
@@ -183,6 +185,8 @@ def get_keys_from_schedule(schedule):
 def script_execute(plugin_logger):
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel()
+
+
 
     if not main_window.show_dialog():
         script.exit()

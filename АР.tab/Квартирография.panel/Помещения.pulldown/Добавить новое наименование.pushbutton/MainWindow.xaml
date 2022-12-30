@@ -62,7 +62,8 @@
                 IsChecked="{Binding is_summer}"/>
             <RadioButton
                 GroupName="OpenGroup"
-                Content="Нет"/>
+                Content="Нет"
+                IsChecked="True"/>
         </StackPanel>
 
         <Label
@@ -80,12 +81,12 @@
                 Width="100"
                 GroupName="LivingGroup"
                 Content="Да"
-                IsChecked="{Binding is_open}"/>
+                IsChecked="{Binding is_living}"/>
             <RadioButton
                 GroupName="LivingGroup"
-                Content="Нет"/>
+                Content="Нет"
+                IsChecked="True"/>
         </StackPanel>
-
 
         <StackPanel Grid.Row="4"
                     Margin="5"
