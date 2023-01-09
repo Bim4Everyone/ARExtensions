@@ -1,0 +1,9 @@
+title:
+  ru: Удалить неиспользуемые наименования
+  en_us: Delete unused names
+
+tooltip:
+  ru: Удаляет из ключевой спецификации строки с наименованиями помещений, которые не используются в текущем проекте
+  en_us: Deletes unused room names from key schedule
+
+author: sssenya
