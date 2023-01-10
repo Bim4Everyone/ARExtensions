@@ -1,0 +1,9 @@
+title:
+  ru: Заморозка площадей
+  en_us: Freeze areas
+
+tooltip:
+  ru: Переносит текущие значения параметров площадей помещений и групп помещений в специальные неизменяемые параметры
+  en_us: Moves room areas to fixed parameters
+
+author: sssenya
