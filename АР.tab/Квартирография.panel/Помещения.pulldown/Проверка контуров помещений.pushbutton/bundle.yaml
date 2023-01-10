@@ -1,0 +1,9 @@
+title:
+  ru: Проверка контуров помещений
+  en_us: Check
+
+tooltip:
+  ru: Проверяет контура всех помещений в проекте на самопересечения
+  en_us: Checks rooms boundaries
+
+author: sssenya

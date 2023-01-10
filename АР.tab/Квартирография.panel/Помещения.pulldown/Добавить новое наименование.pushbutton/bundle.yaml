@@ -1,0 +1,9 @@
+title:
+  ru: Добавить новое наименование
+  en_us: Add new room name
+
+tooltip:
+  ru: Добавляет новое наименование в ключевую спецификацию с наименованиями помещений
+  en_us: Adds new name to room name key schedule
+
+author: sssenya
