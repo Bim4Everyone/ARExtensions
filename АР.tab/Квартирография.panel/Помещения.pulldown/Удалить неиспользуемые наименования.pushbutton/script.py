@@ -208,7 +208,7 @@ def find_schedule(doc, name):
 def get_unused_room_names():
     rooms = FilteredElementCollector(doc)
     rooms.OfCategory(BuiltInCategory.OST_Rooms).ToElements()
-    room_names = {x.LookupParameter("Имя").AsString() for x in rooms}
+    room_names = {x.GetParam(BuiltInParameter.ROOM_NAME).AsString() for x in rooms}
 
     schedule = find_schedule(doc, KeySchedulesConfig.Instance.RoomsNames.ScheduleName)
     all_keys = FilteredElementCollector(schedule.Document, schedule.Id).ToElements()

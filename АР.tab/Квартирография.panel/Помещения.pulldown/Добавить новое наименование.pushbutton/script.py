@@ -5,7 +5,6 @@ clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
 
 clr.AddReference("System.Windows.Forms")
-from System.Windows.Forms import MessageBox
 
 from System.Windows.Input import ICommand
 
@@ -23,6 +22,7 @@ clr.ImportExtensions(dosymep.Bim4Everyone)
 
 from dosymep_libs.bim4everyone import *
 from dosymep.Bim4Everyone.ProjectParams import *
+from dosymep.Bim4Everyone.SharedParams import *
 from dosymep.Bim4Everyone.KeySchedules import *
 
 doc = __revit__.ActiveUIDocument.Document
@@ -140,7 +140,6 @@ class AddNewNameCommand(ICommand):
         keys_before = get_keys_from_schedule(names_schedule)
 
         with Transaction(doc, "BIM: Добавить новое наименование помещения") as t:
-
             t.Start()
             section_data.InsertRow(section_data.FirstRowNumber)
 
@@ -150,11 +149,9 @@ class AddNewNameCommand(ICommand):
 
             new_key.SetParamValue(BuiltInParameter.REF_TABLE_ELEM_NAME, self.__view_model.room_name)
             new_key.SetParamValue(BuiltInParameter.ROOM_NAME, self.__view_model.room_name)
-            new_key.LookupParameter("ФОП_Коэффициент площади").Set(float(self.__view_model.coefficient))
-            #new_key.SetParamValue(ProjectParamsConfig.Instance.RoomAreaRatio, self.__view_model.coefficient)
+            new_key.SetParamValue(SharedParamsConfig.Instance.RoomAreaRatio, float(self.__view_model.coefficient))
             new_key.SetParamValue(ProjectParamsConfig.Instance.IsRoomBalcony, self.__view_model.is_summer)
             new_key.SetParamValue(ProjectParamsConfig.Instance.IsRoomLiving, self.__view_model.is_living)
-
             t.Commit()
 
         return True
@@ -185,8 +182,6 @@ def get_keys_from_schedule(schedule):
 def script_execute(plugin_logger):
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel()
-
-
 
     if not main_window.show_dialog():
         script.exit()
