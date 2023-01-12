@@ -6,11 +6,12 @@
         WindowStartupLocation="CenterScreen"
         Title="Добавить имя"
         Width="350"
-        Height="230"
-        MinHeight="230">
+        Height="240"
+        MinHeight="240">
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition/>
             <RowDefinition/>
             <RowDefinition/>
             <RowDefinition/>
@@ -27,9 +28,8 @@
             Margin="5"
             Content="Наименование:"/>
         <TextBox
-            Grid.Row="0"
-            Grid.Column="1"
-            Margin="5,10"
+            Grid.Row="0" Grid.Column="1"
+            Margin="5"
             TextWrapping="Wrap"
             Text="{Binding room_name, UpdateSourceTrigger=PropertyChanged}"/>
 
@@ -38,9 +38,8 @@
             Content="Коэффициент площади:"
             Margin="5"/>
         <TextBox
-            Grid.Row="1"
-            Grid.Column="1"
-            Margin="5,10"
+            Grid.Row="1" Grid.Column="1"
+            Margin="5"
             TextWrapping="Wrap"
             Text="{Binding coefficient, UpdateSourceTrigger=PropertyChanged}"/>
 
@@ -50,8 +49,7 @@
             VerticalAlignment="Center"
             Content="Летнее:"/>
         <StackPanel
-            Grid.Row="2"
-            Grid.Column="1"
+            Grid.Row="2" Grid.Column="1"
             Margin="5"
             VerticalAlignment="Center"
             Orientation="Horizontal">
@@ -72,8 +70,7 @@
             VerticalAlignment="Center"
             Content="Жилое:"/>
         <StackPanel
-            Grid.Row="3"
-            Grid.Column="1"
+            Grid.Row="3" Grid.Column="1"
             Margin="5"
             VerticalAlignment="Center"
             Orientation="Horizontal">
@@ -88,7 +85,21 @@
                 IsChecked="True"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="4"
+        <Label
+            Grid.Row="4"
+            Margin="5"
+            VerticalAlignment="Center"
+            Content="Назначение:"/>
+        <ComboBox
+            Grid.Row="4" Grid.Column="1"
+            Margin="5"
+            IsEditable="True"
+            IsReadOnly="False"
+            Text="{Binding user_input_department, UpdateSourceTrigger=LostFocus}"
+            ItemsSource="{Binding room_department}"
+            SelectedItem="{Binding selected_department}"/>
+
+        <StackPanel Grid.Row="5"
                     Margin="5"
                     Grid.ColumnSpan="2"
                     Orientation="Horizontal"
@@ -101,8 +112,7 @@
                 VerticalAlignment="Center"
                 HorizontalAlignment="Right"/>
             <Button
-                Grid.Row="4"
-                Grid.Column="1"
+                Grid.Row="4" Grid.Column="1"
                 Width="100"
                 Content="OK"
                 Command="{Binding add_new_name}"/>

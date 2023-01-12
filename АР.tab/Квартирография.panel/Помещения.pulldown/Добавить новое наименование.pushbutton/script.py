@@ -49,6 +49,16 @@ class MainWindowViewModel(Reactive):
         Reactive.__init__(self, *args)
         self.__add_new_name = AddNewNameCommand(self)
 
+        self.__room_name = ""
+        self.__coefficient = "1"
+        self.__is_summer = False
+        self.__is_living = False
+        self.__error_text = ""
+        schedule = find_schedule(doc, KeySchedulesConfig.Instance.RoomsNames.ScheduleName)
+        self.__room_department = get_departments_from_schedule(schedule)
+        self.__selected_department = ""
+        self.__user_input_department = ""
+
     @property
     def add_new_name(self):
         return self.__add_new_name
@@ -86,6 +96,32 @@ class MainWindowViewModel(Reactive):
         self.__is_living = value
 
     @reactive
+    def room_department(self):
+        return self.__room_department
+
+    @room_department.setter
+    def room_department(self, value):
+        self.__room_department = value
+
+    @reactive
+    def selected_department(self):
+        return self.__selected_department
+
+    @selected_department.setter
+    def selected_department(self, value):
+        self.__selected_department = value
+
+    @reactive
+    def user_input_department(self):
+        return self.__user_input_department
+
+    @user_input_department.setter
+    def user_input_department(self, value):
+        self.__user_input_department = value
+        self.__room_department.Add(self.__user_input_department)
+        self.__selected_department = self.__user_input_department
+
+    @reactive
     def error_text(self):
         return self.__error_text
 
@@ -101,12 +137,6 @@ class AddNewNameCommand(ICommand):
         ICommand.__init__(self, *args)
         self.__view_model = view_model
         self.__view_model.PropertyChanged += self.ViewModel_PropertyChanged
-
-        self.__view_model.room_name = ""
-        self.__view_model.coefficient = "1"
-        self.__view_model.is_summer = False
-        self.__view_model.is_living = False
-        self.__error_text = ""
 
     def add_CanExecuteChanged(self, value):
         self.CanExecuteChanged += value
@@ -148,6 +178,7 @@ class AddNewNameCommand(ICommand):
             new_key = doc.GetElement(ElementId(new_key_id))
 
             new_key.SetParamValue(BuiltInParameter.REF_TABLE_ELEM_NAME, self.__view_model.room_name)
+            new_key.SetParamValue(BuiltInParameter.ROOM_DEPARTMENT, self.__view_model.selected_department)
             new_key.SetParamValue(BuiltInParameter.ROOM_NAME, self.__view_model.room_name)
             new_key.SetParamValue(SharedParamsConfig.Instance.RoomAreaRatio, float(self.__view_model.coefficient))
             new_key.SetParamValue(ProjectParamsConfig.Instance.IsRoomBalcony, self.__view_model.is_summer)
@@ -175,6 +206,12 @@ def get_keys_from_schedule(schedule):
     elements = FilteredElementCollector(schedule.Document, schedule.Id).ToElements()
     keys = [x.Id.IntegerValue for x in elements]
     return keys
+
+
+def get_departments_from_schedule(schedule):
+    elements = FilteredElementCollector(schedule.Document, schedule.Id).ToElements()
+    departments = {x.GetParam(BuiltInParameter.ROOM_DEPARTMENT).AsString() for x in elements}
+    return ObservableCollection[str](departments)
 
 
 @notification()
