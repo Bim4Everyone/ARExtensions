@@ -4,7 +4,7 @@ import clr
 clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
 
-from System.Windows.Input import ICommand
+from System import Guid
 
 clr.AddReference("System.Windows.Forms")
 
@@ -13,7 +13,6 @@ from pyrevit import EXEC_PARAMS
 from Autodesk.Revit.DB import *
 
 from pyrevit import *
-from pyrevit.forms import *
 from pyrevit.revit import *
 
 import dosymep
@@ -21,58 +20,17 @@ clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
 
 from dosymep_libs.bim4everyone import *
-from dosymep.Bim4Everyone.ProjectParams import *
 from dosymep.Bim4Everyone.SharedParams import *
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 
 
-def freeze_areas(element):
-    value = element.GetParam(SharedParamsConfig.Instance.ApartmentLivingArea).AsDouble()
-    # element.SetParamValue(SharedParamsConfig.Instance.ApartmentLivingAreaFix, value)
-    # #element.LookupParameter("ФОП_ПД_КВ_Приведенная площадь").Set(value)
-    #
-    # value = element.GetParam(SharedParamsConfig.Instance.ApartmentAreaRatio).AsDouble()
-    # element.SetParamValue(SharedParamsConfig.Instance.ApartmentAreaRatioFix, value)
-    # #element.LookupParameter("ФОП_ПД_КВ_Приведенная площадь").Set(value)
-    #
-    # value = element.GetParam(SharedParamsConfig.Instance.ApartmentArea).AsDouble()
-    element.SetParamValue(SharedParamsConfig.Instance.ApartmentAreaFix, value)
-    # # element.LookupParameter("ФОП_ПД_КВ_Приведенная площадь").Set(value)
-    #
-    # value = element.GetParam(SharedParamsConfig.Instance.ApartmentAreaNoBalcony).AsDouble()
-    # element.SetParamValue(SharedParamsConfig.Instance.ApartmentAreaNoBalconyFix, value)
-    # # element.LookupParameter("ФОП_ПД_КВ_Приведенная площадь").Set(value)
-    #
-    # value = element.GetParam(SharedParamsConfig.Instance.RoomAreaWithRatio).AsDouble()
-    # element.SetParamValue(SharedParamsConfig.Instance.RoomAreaWithRatioFix, value)
-    # # element.LookupParameter("ФОП_ПД_КВ_Приведенная площадь").Set(value)
-    #
-    # value = element.GetParam(SharedParamsConfig.Instance.RoomArea).AsDouble()
-    # element.SetParamValue(SharedParamsConfig.Instance.RoomAreaFix, value)
-    # #element.LookupParameter("ФОП_ПД_КВ_Приведенная площадь").Set(value)
+def freeze_area(element, param, guid_str):
+    value = element.GetParam(param).AsDouble()
+    guid = Guid(guid_str)
+    element.SetParamValue(element.get_Parameter(guid).Definition.Name, value)
 
-# "ФОП_КВР_Площадь жилая" ProjectParamsConfig.Instance.ApartmentLivingArea
-# "ФОП_ФИКС_КВР_Площадь жилая" ProjectParamsConfig.Instance.ApartmentLivingAreaFix
-
-# "ФОП_КВР_Площадь с коэф." ProjectParamsConfig.Instance.ApartmentAreaRatio
-# "ФОП_ФИКС_КВР_Площадь с коэф." ProjectParamsConfig.Instance.ApartmentAreaRatioFix
-
-# "ФОП_КВР_Площадь без коэф." ProjectParamsConfig.Instance.ApartmentArea
-# "ФОП_ФИКС_КВР_Площадь без коэф." ProjectParamsConfig.Instance.ApartmentAreaFix
-
-# "ФОП_КВР_Площадь без ЛП" ProjectParamsConfig.Instance.ApartmentAreaNoBalcony
-# "ФОП_ФИКС_КВР_Площадь без ЛП" ProjectParamsConfig.Instance.ApartmentAreaNoBalconyFix
-
-# "ФОП_КВР_Площадь по пятну" ProjectParamsConfig.Instance.ApartmentFullArea
-# "ФОП_ФИКС_КВР_Площадь по пятну" ProjectParamsConfig.Instance.ApartmentFullAreaFix
-
-# "ФОП_ПМЩ_Площадь с коэф." ProjectParamsConfig.Instance.RoomAreaWithRatio
-# "ФОП_ФИКС_ПМЩ_Площадь с коэф." ProjectParamsConfig.Instance.RoomAreaWithRatioFix
-
-# "ФОП_ПМЩ_Площадь" ProjectParamsConfig.Instance.RoomArea
-# "ФОП_ФИКС_ПМЩ_Площадь" ProjectParamsConfig.Instance.RoomAreaFix
 
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
@@ -82,7 +40,13 @@ def script_execute(plugin_logger):
     with Transaction(doc, "BIM: Заморозить площади помещений") as t:
         t.Start()
         for room in rooms:
-            freeze_areas(room)
+            freeze_area(room, SharedParamsConfig.Instance.ApartmentLivingArea, '421ec146-2f9b-48ae-9bcc-1f478c115e7e')
+            freeze_area(room, SharedParamsConfig.Instance.ApartmentAreaRatio, '77713404-35ef-4c8a-a5c4-c6f3d4da16c2')
+            freeze_area(room, SharedParamsConfig.Instance.ApartmentArea, '3d6c5084-d6ab-490e-baa6-f8d119a0d628')
+            freeze_area(room, SharedParamsConfig.Instance.ApartmentAreaNoBalcony, '8226f116-c19e-4797-a3bb-55ac79acdf44')
+            # freeze_area(room, SharedParamsConfig.Instance.ApartmentFullAreaFix, 'bc1bf705-37a8-404e-af7c-ca072168b994')
+            freeze_area(room, SharedParamsConfig.Instance.RoomAreaWithRatio, '46bc1213-6d5a-4164-84d0-598a9abcf70d')
+            freeze_area(room, SharedParamsConfig.Instance.RoomArea, '64bf4d4d-6ef3-4cfd-b452-eccdde94a8ad')
         t.Commit()
 
 
