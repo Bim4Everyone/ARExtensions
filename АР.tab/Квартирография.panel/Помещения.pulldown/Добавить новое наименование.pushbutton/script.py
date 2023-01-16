@@ -199,6 +199,9 @@ def find_schedule(doc, name):
     name_filter = ElementParameterFilter(filter_rule)
 
     schedules.WherePasses(name_filter)
+    if not schedules.FirstElement():
+        print("Спецификация '{}' отсутствует в проекте".format(name))
+        script.exit()
     return schedules.FirstElement()
 
 
