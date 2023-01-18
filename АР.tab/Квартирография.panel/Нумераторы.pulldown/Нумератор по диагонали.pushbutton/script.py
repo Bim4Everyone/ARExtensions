@@ -135,6 +135,7 @@ class RoomsNumerator:
                 self.placed_number.append(number)
                 name = "{}{}{}".format(self.prefix, number, self.suffix)
                 room.set_num(name)
+            alert("Последний назначенный номер: {}".format(number))
 
 
 @notification()

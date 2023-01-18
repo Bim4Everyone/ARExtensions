@@ -587,6 +587,8 @@ class NumerateRoomsCommand(ICommand):
                         "Id: {} ComputedIndex: {} Index: {}".format(output.linkify(room.Element.Id), room.Index, index))
 
                     index += 1
+                forms.alert("Последний назначенный номер: {}".format(index-1))
+
         finally:
             stopwatch.Stop()
             log_elapsed_time("Operations Elapsed: {}".format(stopwatch.Elapsed))
