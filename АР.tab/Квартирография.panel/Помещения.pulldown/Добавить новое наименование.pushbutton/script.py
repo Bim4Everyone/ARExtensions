@@ -12,7 +12,6 @@ import pyevent #pylint: disable=import-error
 
 from pyrevit import *
 from pyrevit.forms import *
-from pyrevit.revit import *
 
 from Autodesk.Revit.DB import *
 
@@ -24,6 +23,7 @@ from dosymep_libs.bim4everyone import *
 from dosymep.Bim4Everyone.ProjectParams import *
 from dosymep.Bim4Everyone.SharedParams import *
 from dosymep.Bim4Everyone.KeySchedules import *
+from dosymep.Bim4Everyone.Templates import ProjectParameters
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -43,9 +43,17 @@ class MainWindow(WPFWindow):
         self.xaml_source = op.join(op.dirname(__file__), 'MainWindow.xaml')
         super(MainWindow, self).__init__(self.xaml_source)
 
+    def ButtonOK_Click(self, sender, e):
+        self.DialogResult = True
+        show_executed_script_notification()
+
+    def ButtonCancel_Click(self, sender, e):
+        self.DialogResult = False
+        self.Close()
+
 
 class MainWindowViewModel(Reactive):
-    def __init__(self, *args):
+    def __init__(self, schedule_rule, *args):
         Reactive.__init__(self, *args)
         self.__add_new_name = AddNewNameCommand(self)
 
@@ -54,8 +62,8 @@ class MainWindowViewModel(Reactive):
         self.__is_summer = False
         self.__is_living = False
         self.__error_text = ""
-        schedule = find_schedule(doc, KeySchedulesConfig.Instance.RoomsNames.ScheduleName)
-        self.__room_department = get_departments_from_schedule(schedule)
+        self.__schedule = find_schedule(doc, schedule_rule.ScheduleName)
+        self.__room_department = get_departments_from_schedule(self.__schedule)
         self.__selected_department = ""
         self.__user_input_department = ""
 
@@ -129,6 +137,10 @@ class MainWindowViewModel(Reactive):
     def error_text(self, value):
         self.__error_text = value
 
+    @reactive
+    def schedule(self):
+        return self.__schedule
+
 
 class AddNewNameCommand(ICommand):
     CanExecuteChanged, _canExecuteChanged = pyevent.make_event()
@@ -163,14 +175,13 @@ class AddNewNameCommand(ICommand):
         return True
 
     def Execute(self, parameter):
-        names_schedule = find_schedule(doc, KeySchedulesConfig.Instance.RoomsNames.ScheduleName)
+        names_schedule = self.__view_model.schedule
         table_data = names_schedule.GetTableData()
         section_data = table_data.GetSectionData(SectionType.Body)
 
         keys_before = get_keys_from_schedule(names_schedule)
 
-        with Transaction(doc, "BIM: Добавить новое наименование помещения") as t:
-            t.Start()
+        with revit.Transaction("BIM: Добавить новое наименование помещения"):
             section_data.InsertRow(section_data.FirstRowNumber)
 
             keys_after = get_keys_from_schedule(names_schedule)
@@ -183,13 +194,12 @@ class AddNewNameCommand(ICommand):
             new_key.SetParamValue(SharedParamsConfig.Instance.RoomAreaRatio, float(self.__view_model.coefficient))
             new_key.SetParamValue(ProjectParamsConfig.Instance.IsRoomBalcony, self.__view_model.is_summer)
             new_key.SetParamValue(ProjectParamsConfig.Instance.IsRoomLiving, self.__view_model.is_living)
-            t.Commit()
 
         return True
 
 
-def find_schedule(doc, name):
-    schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
+def find_schedule(document, name):
+    schedules = FilteredElementCollector(document).OfClass(ViewSchedule)
 
     fvp = ParameterValueProvider(ElementId(BuiltInParameter.VIEW_NAME))
     rule = FilterStringEquals()
@@ -199,9 +209,6 @@ def find_schedule(doc, name):
     name_filter = ElementParameterFilter(filter_rule)
 
     schedules.WherePasses(name_filter)
-    if not schedules.FirstElement():
-        print("Спецификация '{}' отсутствует в проекте".format(name))
-        script.exit()
     return schedules.FirstElement()
 
 
@@ -213,18 +220,24 @@ def get_keys_from_schedule(schedule):
 
 def get_departments_from_schedule(schedule):
     elements = FilteredElementCollector(schedule.Document, schedule.Id).ToElements()
-    departments = {x.GetParam(BuiltInParameter.ROOM_DEPARTMENT).AsString() for x in elements}
+    departments = {x.GetParamValueOrDefault(BuiltInParameter.ROOM_DEPARTMENT) for x in elements}
     return ObservableCollection[str](departments)
 
 
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
-    main_window = MainWindow()
-    main_window.DataContext = MainWindowViewModel()
+    script_start = True
+    name_schedule = KeySchedulesConfig.Instance.RoomsNames
+    ProjectParameters.Create(doc.Application).SetupSchedule(doc, False, name_schedule)
 
-    if not main_window.show_dialog():
-        script.exit()
+    while script_start:
+        main_window = MainWindow()
+        main_window.DataContext = MainWindowViewModel(name_schedule)
+        main_window.show_dialog()
+        script_start = main_window.DialogResult
+        if not script_start:
+            script.exit()
 
 
 script_execute()

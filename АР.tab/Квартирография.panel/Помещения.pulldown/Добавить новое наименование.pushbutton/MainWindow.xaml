@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         WindowStartupLocation="CenterScreen"
         Title="Добавить имя"
-        Width="350"
+        Width="400"
         Height="240"
         MinHeight="240">
 
@@ -105,17 +105,21 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
             <TextBlock
-                Grid.Row="4"
-                Margin="10, 0"
                 Text="{Binding error_text, FallbackValue=ErrorText}"
                 Foreground="Orange"
                 VerticalAlignment="Center"
                 HorizontalAlignment="Right"/>
             <Button
-                Grid.Row="4" Grid.Column="1"
-                Width="100"
+                Margin="10, 0"
+                Width="80"
                 Content="OK"
+                Click="ButtonOK_Click"
                 Command="{Binding add_new_name}"/>
+            <Button
+                Width="80"
+                Content="Отмена"
+                IsCancel="true"
+                Click="ButtonCancel_Click"/>
         </StackPanel>
     </Grid>
 </Window>

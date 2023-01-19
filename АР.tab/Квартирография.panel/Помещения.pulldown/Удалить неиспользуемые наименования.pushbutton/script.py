@@ -6,10 +6,6 @@ clr.AddReference("dosymep.Bim4Everyone.dll")
 
 from System.Windows.Input import ICommand
 
-clr.AddReference("System.Windows.Forms")
-
-from pyrevit import EXEC_PARAMS
-
 from Autodesk.Revit.DB import *
 
 from pyrevit import *
@@ -23,6 +19,7 @@ clr.ImportExtensions(dosymep.Bim4Everyone)
 from dosymep_libs.bim4everyone import *
 from dosymep.Bim4Everyone.ProjectParams import *
 from dosymep.Bim4Everyone.KeySchedules import *
+from dosymep.Bim4Everyone.Templates import ProjectParameters
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -109,10 +106,10 @@ class DeleteKeyCommand(ICommand):
         return True
 
     def Execute(self, parameter):
-        with Transaction(doc, "BIM: Удалить неиспользуемые наименования") as t:
-            t.Start()
-            [doc.Delete(x.key_object.Id) for x in self.__view_model.names if x.is_checked]
-            t.Commit()
+        with revit.Transaction("BIM: Удалить неиспользуемые наименования"):
+            for name in self.__view_model.names:
+                if name.is_checked:
+                    doc.Delete(name.key_object.Id)
 
 
 class MainWindow(WPFWindow):
@@ -125,6 +122,10 @@ class MainWindow(WPFWindow):
         self.DialogResult = True
         self.Close()
 
+    def ButtonCancel_Click(self, sender, e):
+        self.DialogResult = False
+        self.Close()
+
 
 class MainWindowViewModel(Reactive):
     def __init__(self, names, *args):
@@ -134,6 +135,7 @@ class MainWindowViewModel(Reactive):
         self.__invert_states = InvertCommand(self)
         self.__set_all_true = UpdateStatesCommand(self, True)
         self.__set_all_false = UpdateStatesCommand(self, False)
+        self.__error_text = ""
 
     @property
     def delete_names(self):
@@ -171,7 +173,8 @@ class MainWindowViewModel(Reactive):
 class KeyRoomName(Reactive):
     def __init__(self, key_object):
         self.key_object = key_object
-        self.__name = key_object.GetParam(BuiltInParameter.ROOM_NAME).AsString()
+        self.__name = key_object.GetParamValueOrDefault(BuiltInParameter.ROOM_NAME)
+        self.__department = key_object.GetParamValueOrDefault(BuiltInParameter.ROOM_DEPARTMENT)
         self.__is_checked = False
 
     @reactive
@@ -183,6 +186,14 @@ class KeyRoomName(Reactive):
         self.__name = value
 
     @reactive
+    def department(self):
+        return self.__department
+
+    @department.setter
+    def department(self, value):
+        self.__department = value
+
+    @reactive
     def is_checked(self):
         return self.__is_checked
 
@@ -191,8 +202,8 @@ class KeyRoomName(Reactive):
         self.__is_checked = value
 
 
-def find_schedule(doc, name):
-    schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
+def find_schedule(document, name):
+    schedules = FilteredElementCollector(document).OfClass(ViewSchedule)
 
     fvp = ParameterValueProvider(ElementId(BuiltInParameter.VIEW_NAME))
     rule = FilterStringEquals()
@@ -202,18 +213,15 @@ def find_schedule(doc, name):
     name_filter = ElementParameterFilter(filter_rule)
 
     schedules.WherePasses(name_filter)
-    if not schedules.FirstElement():
-        print("Спецификация '{}' отсутствует в проекте".format(name))
-        script.exit()
     return schedules.FirstElement()
 
 
-def get_unused_room_names():
+def get_unused_room_names(schedule_rule):
     rooms = FilteredElementCollector(doc)
     rooms.OfCategory(BuiltInCategory.OST_Rooms).ToElements()
-    room_names = {x.GetParam(BuiltInParameter.ROOM_NAME).AsString() for x in rooms}
+    room_names = {x.GetParamValueOrDefault(BuiltInParameter.ROOM_NAME) for x in rooms}
 
-    schedule = find_schedule(doc, KeySchedulesConfig.Instance.RoomsNames.ScheduleName)
+    schedule = find_schedule(doc, schedule_rule.ScheduleName)
     all_keys = FilteredElementCollector(schedule.Document, schedule.Id).ToElements()
     key_names = [KeyRoomName(x) for x in all_keys]
 
@@ -225,7 +233,9 @@ def get_unused_room_names():
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
-    unused_names = get_unused_room_names()
+    name_schedule = KeySchedulesConfig.Instance.RoomsNames
+    ProjectParameters.Create(doc.Application).SetupSchedule(doc, False, name_schedule)
+    unused_names = get_unused_room_names(name_schedule)
 
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(unused_names)

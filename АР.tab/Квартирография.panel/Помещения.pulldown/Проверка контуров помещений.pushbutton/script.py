@@ -4,11 +4,11 @@ import clr
 clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
 
-clr.AddReference("System.Windows.Forms")
-
 from pyrevit.forms import *
 from pyrevit import EXEC_PARAMS
+from pyrevit import script
 
+from Autodesk.Revit.DB.Architecture import Room
 from Autodesk.Revit.DB import *
 
 import dosymep
@@ -17,7 +17,6 @@ clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
 
 from dosymep_libs.bim4everyone import *
-from dosymep.Bim4Everyone.ProjectParams import *
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -27,7 +26,7 @@ class RoomContour:
     def __init__(self, room):
         self.object = room
         self.id = room.Id
-        self.name = room.GetParam(BuiltInParameter.ROOM_DEPARTMENT).AsString()
+        self.name = room.GetParam(BuiltInParameter.ROOM_NAME).AsString()
         self.level = room.GetParam(BuiltInParameter.ROOM_LEVEL_ID).AsValueString()
         self.phase = room.GetParam(BuiltInParameter.ROOM_PHASE).AsValueString()
 
@@ -77,18 +76,25 @@ def get_rooms():
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
+    errors = []
     contours = [RoomContour(x) for x in get_rooms()]
-    error_rooms = [x for x in contours if x.has_intersection]
 
-    if error_rooms:
-        print('Помещение имеет самопересекающийся контур')
-        for room in error_rooms:
-            try:
-                print('{} | {} | {} | {}'.format(room.id, room.name, room.level, room.phase))
-            except Exception as e:
-                print(e)
+    for room in contours:
+        if room.has_intersection:
+            room_error = []
+            room_error.append(room.id)
+            room_error.append(room.name)
+            room_error.append(room.level)
+            room_error.append(room.phase)
+            errors.append(room_error)
+
+    if errors:
+        output = script.get_output()
+        output.print_table(table_data=errors,
+                           title="Помещения с самопересекающимся контуром",
+                           columns=["Id", "Имя", "Уровень", "Стадия"])
     else:
-        print('Ошибки не найдены!')
+        alert('Ошибки не найдены!')
 
 
 script_execute()

@@ -4,11 +4,11 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:UpdateSelectedLinks"
-             Title="Связи"
+             Title="Удалить наименования"
              mc:Ignorable="d"
              WindowStartupLocation="CenterScreen"
-             Height="450" Width="400"
-             MinHeight="350">
+             Height="500" Width="500"
+             MinHeight="350" MinWidth="500">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="30"/>
@@ -31,18 +31,28 @@
             VerticalAlignment="Center"
             Text="Неиспользуемые наименования помещений"/>
 
-        <ListBox
+        <ListView
             Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
             Margin="10,5,10,5"
             ItemsSource="{Binding names}">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <CheckBox
-                        Content="{Binding name}"
-                        IsChecked="{Binding is_checked}"/>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Width="30">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding is_checked}"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn
+                        Header="Имя" Width="220"
+                        DisplayMemberBinding="{Binding name}"/>
+                    <GridViewColumn
+                        Header="Назначение" Width="200"
+                        DisplayMemberBinding="{Binding department}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
 
         <Button
             Grid.Row="2" Grid.Column="0"
@@ -69,18 +79,21 @@
             Orientation="Horizontal"
             HorizontalAlignment="Right">
             <TextBlock
-                Grid.Row="4"
-                Margin="10, 0"
                 Text="{Binding error_text, FallbackValue=ErrorText}"
                 Foreground="Orange"
                 VerticalAlignment="Center"
                 HorizontalAlignment="Right"/>
             <Button
-                Grid.Row="3" Grid.Column="2"
                 Width="100"
+                Margin="10, 0"
                 Command="{Binding delete_names}"
                 Click="button_ok_click"
                 Content="Удалить"/>
+            <Button
+                Width="100"
+                Content="Отмена"
+                IsCancel="true"
+                Click="ButtonCancel_Click"/>
         </StackPanel>
     </Grid>
 </Window>
