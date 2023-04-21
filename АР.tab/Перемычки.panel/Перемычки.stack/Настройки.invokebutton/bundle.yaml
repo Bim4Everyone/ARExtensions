@@ -1,0 +1,10 @@
+title:
+  ru: Настройки
+  en_us: Settings
+
+tooltip:
+  ru: Настройки плагина для расстановки перемычек
+  en_us: Plugin settings for placing lintels
+
+assembly: RevitLintelPlacement.dll
+command_class: ConfigurateLintelPluginCommand

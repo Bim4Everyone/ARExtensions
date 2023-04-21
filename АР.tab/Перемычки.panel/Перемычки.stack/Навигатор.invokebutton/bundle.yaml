@@ -1,0 +1,10 @@
+title:
+  ru: Навигатор
+  en_us: Navigator
+
+tooltip:
+  ru: Просмотр перемычек
+  en_us: View lintels
+
+assembly: RevitLintelPlacement.dll
+command_class: ViewLintelsCommand

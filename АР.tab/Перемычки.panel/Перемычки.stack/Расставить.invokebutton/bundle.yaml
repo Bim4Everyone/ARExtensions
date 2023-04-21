@@ -1,0 +1,10 @@
+title:
+  ru: Расставить
+  en_us: Place
+
+tooltip:
+  ru: Расставляет перемычки
+  en_us: Places lintels
+
+assembly: RevitLintelPlacement.dll
+command_class: PlaceLintelCommand
