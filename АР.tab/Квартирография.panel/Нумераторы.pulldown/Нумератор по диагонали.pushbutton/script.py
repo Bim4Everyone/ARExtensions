@@ -15,7 +15,7 @@ from pyrevit import EXEC_PARAMS
 from Autodesk.Revit.DB.Architecture import Room
 from Autodesk.Revit.DB import *
 
-from pyrevit.revit import Transaction
+from pyrevit import revit
 
 import dosymep
 clr.ImportExtensions(dosymep.Revit)
@@ -126,7 +126,7 @@ class RoomsNumerator:
 
     def renumber_rooms(self):
         self.__sort_rooms()
-        with Transaction("BIM: Нумерация по диагонали"):
+        with revit.Transaction("BIM: Нумерация по диагонали"):
             for i, room in enumerate(self.rooms_to_num):
                 number = self.start + i
                 while str(number) in self.placed_number:

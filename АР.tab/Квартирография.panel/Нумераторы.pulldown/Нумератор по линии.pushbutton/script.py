@@ -15,8 +15,10 @@ from Autodesk.Revit.DB import *
 
 from pyrevit import forms
 from pyrevit import EXEC_PARAMS
+from pyrevit import revit
 from pyrevit.forms import Reactive, reactive
-from pyrevit.revit import selection, Transaction, HOST_APP
+from pyrevit.revit import selection, HOST_APP
+# from pyrevit.revit import Transaction as pyTransaction
 
 import dosymep
 clr.ImportExtensions(dosymep.Revit)
@@ -575,7 +577,7 @@ class NumerateRoomsCommand(ICommand):
             elements = [element for element in elements
                         if is_intersect_room(element, view_model.element)]
 
-            with Transaction("BIM: Нумерация по линии"):
+            with revit.Transaction("BIM: Нумерация по линии"):
                 index_rooms = get_index_elements(curve, elements)
                 index_rooms = sorted(index_rooms, key=lambda x: x.Index)
 
