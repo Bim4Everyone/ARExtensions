@@ -29,6 +29,7 @@ class RoomContour:
         self.name = room.GetParam(BuiltInParameter.ROOM_NAME).AsString()
         self.level = room.GetParam(BuiltInParameter.ROOM_LEVEL_ID).AsValueString()
         self.phase = room.GetParam(BuiltInParameter.ROOM_PHASE).AsValueString()
+        self.document = room.Document.Title
 
         self.__main_contour = self.__get_contours()[0]
         self.__has_intersection = False
@@ -63,13 +64,28 @@ class RoomContour:
         return contours
 
 
+def get_all_docs():
+    links_doc = [doc]
+    links = FilteredElementCollector(doc).OfClass(RevitLinkInstance)
+    not_nested_links = [x for x in links if not doc.GetElement(x.GetTypeId()).IsNestedLink]
+
+    for link in not_nested_links:
+        link_doc = link.GetLinkDocument()
+        if link_doc:
+            links_doc.append(link_doc)
+
+    return links_doc
+
+
 def get_rooms():
     selection = [doc.GetElement(x) for x in uidoc.Selection.GetElementIds()]
     rooms = [x for x in selection if isinstance(x, Room)]
     if not rooms:
-        all_rooms = FilteredElementCollector(doc)
-        all_rooms.OfCategory(BuiltInCategory.OST_Rooms).ToElements()
-        rooms = [x for x in all_rooms if x.Area > 0]
+        docs = get_all_docs()
+        for document in docs:
+            doc_rooms = FilteredElementCollector(document)
+            doc_rooms.OfCategory(BuiltInCategory.OST_Rooms).ToElements()
+            rooms += [x for x in doc_rooms if x.Area > 0]
     return rooms
 
 
@@ -86,13 +102,14 @@ def script_execute(plugin_logger):
             room_error.append(room.name)
             room_error.append(room.level)
             room_error.append(room.phase)
+            room_error.append(room.document)
             errors.append(room_error)
 
     if errors:
         output = script.get_output()
         output.print_table(table_data=errors,
                            title="Помещения с самопересекающимся контуром",
-                           columns=["Id", "Имя", "Уровень", "Стадия"])
+                           columns=["Id", "Имя", "Уровень", "Стадия", "Файл"])
     else:
         alert('Ошибки не найдены!')
 
