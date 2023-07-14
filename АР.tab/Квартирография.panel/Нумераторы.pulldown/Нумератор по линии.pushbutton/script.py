@@ -105,23 +105,26 @@ def convert_value(value):
 
 
 def is_intersect_room(room_element, curve_element):
-    segments = room_element.GetBoundarySegments(SpatialElementBoundaryOptions())
-    segments = [segment for inner_segments in segments
-                for segment in inner_segments]
+    if not hasattr(room_element, "GetBoundarySegments"):
+        return True
+    else:
+        segments = room_element.GetBoundarySegments(SpatialElementBoundaryOptions())
+        segments = [segment for inner_segments in segments
+                    for segment in inner_segments]
 
-    for segment in segments:
-        curve = segment.GetCurve()
+        for segment in segments:
+            curve = segment.GetCurve()
 
-        start = curve.GetEndPoint(0)
-        finish = curve.GetEndPoint(1)
+            start = curve.GetEndPoint(0)
+            finish = curve.GetEndPoint(1)
 
-        point = curve_element.GeometryCurve.GetEndPoint(0)
-        start = XYZ(start.X, start.Y, point.Z)
-        finish = XYZ(finish.X, finish.Y, point.Z)
+            point = curve_element.GeometryCurve.GetEndPoint(0)
+            start = XYZ(start.X, start.Y, point.Z)
+            finish = XYZ(finish.X, finish.Y, point.Z)
 
-        line = Line.CreateBound(start, finish)
-        if line.Intersect(curve_element.GeometryCurve) == SetComparisonResult.Overlap:
-            return True
+            line = Line.CreateBound(start, finish)
+            if line.Intersect(curve_element.GeometryCurve) == SetComparisonResult.Overlap:
+                return True
 
 
 def get_index_point(element, index_points):
@@ -578,17 +581,20 @@ class NumerateRoomsCommand(ICommand):
                         if is_intersect_room(element, view_model.element)]
 
             with revit.Transaction("BIM: Нумерация по линии"):
-                index_rooms = get_index_elements(curve, elements)
-                index_rooms = sorted(index_rooms, key=lambda x: x.Index)
+                index_elements = get_index_elements(curve, elements)
+                index_elements = sorted(index_elements, key=lambda x: x.Index)
 
                 index = int(view_model.start_number)
-                for room in index_rooms:
-                    room.Element.SetParamValue(view_model.param_name,
-                                               view_model.prefix + str(index) + view_model.suffix)
-                    log_information(
-                        "Id: {} ComputedIndex: {} Index: {}".format(output.linkify(room.Element.Id), room.Index, index))
+                for index_element in index_elements:
+                    if not index_element.Element.GetParamValueOrDefault(ProjectParamsConfig.Instance.IsRoomNumberFix):
+                        index_element.Element.SetParamValue(view_model.param_name,
+                                                   view_model.prefix + str(index) + view_model.suffix)
+                        log_information(
+                            "Id: {} ComputedIndex: {} Index: {}".format(output.linkify(index_element.Element.Id),
+                                                                        index_element.Index,
+                                                                        index))
 
-                    index += 1
+                        index += 1
                 forms.alert("Последний назначенный номер: {}".format(index-1))
 
         finally:
