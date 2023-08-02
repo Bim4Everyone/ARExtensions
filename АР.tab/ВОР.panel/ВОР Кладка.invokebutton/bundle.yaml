@@ -1,0 +1,15 @@
+title:
+  ru: >-
+    ВОР 
+    
+    Кладка
+  en_us: Volume Of Work
+
+tooltip:
+  ru: В параметры стен записывает информацию о помещениях, для которых является границей.
+  en_us: Sets wall parameters with rooms information, bounded by this wall.
+
+assembly: RevitVolumeOfWork.dll
+command_class: RevitVolumeOfWorkCommand
+
+author: sssenya
