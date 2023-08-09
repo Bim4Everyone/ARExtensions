@@ -1,0 +1,10 @@
+title:
+  ru: Создание архитектурной документации
+  en_us: RevitArchitecturalDocumentation
+
+tooltip:
+  ru: Создание документации ПСО и ДДУ.
+  en_us: Creation of PSO and DDU documentation.
+
+assembly: RevitArchitecturalDocumentation.dll
+command_class: RevitArchitecturalDocumentationCommand
