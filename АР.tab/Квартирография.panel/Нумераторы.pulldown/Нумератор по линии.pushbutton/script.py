@@ -18,7 +18,6 @@ from pyrevit import EXEC_PARAMS
 from pyrevit import revit
 from pyrevit.forms import Reactive, reactive
 from pyrevit.revit import selection, HOST_APP
-# from pyrevit.revit import Transaction as pyTransaction
 
 import dosymep
 clr.ImportExtensions(dosymep.Revit)
@@ -244,21 +243,13 @@ class RevitRepository:
             if element.LevelId == document.ActiveView.GenLevel.Id]
 
         self.__room_elements = self.get_elements(self.get_category_name(BuiltInCategory.OST_Rooms))
-        self.__parking_elements = self.get_elements(self.get_category_name(BuiltInCategory.OST_Parking))
 
     @property
     def is_empty(self):
-        return not self.__room_elements and not self.__parking_elements
+        return not self.__room_elements
 
     def get_category(self, category):
         return self.__document.Settings.Categories.Item[category]
-
-    def get_categories(self):
-        if self.__room_elements:
-            yield self.get_category_name(BuiltInCategory.OST_Rooms)
-
-        if self.__parking_elements:
-            yield self.get_category_name(BuiltInCategory.OST_Parking)
 
     def get_phases(self, category):
         elements = self.get_elements(category)
@@ -271,10 +262,6 @@ class RevitRepository:
 
         return set()
 
-    def get_families(self, category):
-        elements = self.get_elements(category)
-        return set(sorted([self.get_family(element) for element in elements]))
-
     def get_elements(self, category):
         if category and isinstance(category, str):
             category = self.get_category(category)
@@ -282,9 +269,6 @@ class RevitRepository:
 
         if category == BuiltInCategory.OST_Rooms:
             return self.__room_elements
-
-        if category == BuiltInCategory.OST_Parking:
-            return self.__parking_elements
 
         return set()
 
@@ -294,30 +278,10 @@ class RevitRepository:
             if category.Id == ElementId(BuiltInCategory.OST_Rooms):
                 return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
 
-            if category.Id == ElementId(BuiltInCategory.OST_Parking):
-                return LabelUtils.GetLabelFor(BuiltInParameter.DOOR_NUMBER)
-
-    def family_required(self, category):
-        if category:
-            cat = self.get_category(category)
-            if cat.Id == ElementId(BuiltInCategory.OST_Rooms):
-                return False
-
-            if cat.Id == ElementId(BuiltInCategory.OST_Parking):
-                return True
-
     @staticmethod
     def get_phase(element):
         if element.Category.Id == ElementId(BuiltInCategory.OST_Rooms):
             return element.GetParam(BuiltInParameter.ROOM_PHASE).AsValueString()
-
-        if element.Category.Id == ElementId(BuiltInCategory.OST_Parking):
-            return element.GetParam(BuiltInParameter.PHASE_CREATED).AsValueString()
-
-    @staticmethod
-    def get_family(element):
-        if element.Category.Id == ElementId(BuiltInCategory.OST_Parking):
-            return element.GetParam(BuiltInParameter.ELEM_FAMILY_PARAM).AsValueString()
 
     @staticmethod
     def get_category_name(category):
@@ -346,7 +310,6 @@ class MainWindowViewModel(Reactive):
         self.__suffix = ""
 
         self.__error_text = ""
-        self.__family_required = None
         self.__numerate_command = NumerateRoomsCommand(self, self.__revit_repository)
         self.__select_line_command = SelectLineCommand(view, self, self.__revit_repository)
 
@@ -356,25 +319,13 @@ class MainWindowViewModel(Reactive):
         self.__param_names = []
         self.__param_name = None
 
-        self.__family_names = []
-        self.__family_name = None
+        self.__category_name = self.__revit_repository.get_category_name(BuiltInCategory.OST_Rooms)
 
-        self.__category_names = set(self.__revit_repository.get_categories())
-        self.__category_name = get_next(self.__category_names, None)
-
-        self.OnUpdateCategory(self.__category_name)
-
-    def OnUpdateCategory(self, category):
         self.phase_names = self.__revit_repository.get_phases(self.__category_name)
         self.phase_name = get_next(self.__phase_names, None)
 
-        self.param_name = self.__revit_repository.get_default_param(category)
+        self.param_name = self.__revit_repository.get_default_param(self.__category_name)
         self.param_names = self.__revit_repository.get_params(self.__category_name)
-
-        self.family_names = self.__revit_repository.get_families(self.__category_name)
-        self.family_name = get_next(self.__family_names, None)
-
-        self.family_required = self.__revit_repository.family_required(category)
 
     @property
     def element(self):
@@ -392,22 +343,6 @@ class MainWindowViewModel(Reactive):
     @element_name.setter
     def element_name(self, value):
         self.__element_name = value
-
-    @reactive
-    def family_required(self):
-        return self.__family_required
-
-    @family_required.setter
-    def family_required(self, value):
-        self.__family_required = value
-
-    @reactive
-    def category_names(self):
-        return self.__category_names
-
-    @category_names.setter
-    def category_names(self, value):
-        self.__category_names = value
 
     @reactive
     def category_name(self):
@@ -475,22 +410,6 @@ class MainWindowViewModel(Reactive):
         self.__param_name = value
 
     @reactive
-    def family_names(self):
-        return self.__family_names
-
-    @family_names.setter
-    def family_names(self, value):
-        self.__family_names = value
-
-    @reactive
-    def family_name(self):
-        return self.__family_name
-
-    @family_name.setter
-    def family_name(self, value):
-        self.__family_name = value
-
-    @reactive
     def error_text(self):
         return self.__error_text
 
@@ -549,10 +468,6 @@ class NumerateRoomsCommand(ICommand):
             self.__view_model.error_text = "Параметр должен быть заполнен."
             return False
 
-        if not self.__view_model.family_name and self.__is_required_family():
-            self.__view_model.error_text = "Семейство должно быть заполнено."
-            return False
-
         if not is_int(self.__view_model.start_number):
             self.__view_model.error_text = "Начальный номер должен быть числом."
             return False
@@ -571,9 +486,6 @@ class NumerateRoomsCommand(ICommand):
         view_model = self.__view_model
         elements = self.__revit_repository.get_elements(view_model.category_name)
         elements = [element for element in elements if self.__get_phase_name(element) == view_model.phase_name]
-
-        if self.__family_required(view_model.category_name):
-            elements = [element for element in elements if self.__get_family(element) == view_model.family_name]
 
         try:
             curve = view_model.element.Location.Curve
@@ -601,17 +513,8 @@ class NumerateRoomsCommand(ICommand):
             stopwatch.Stop()
             log_elapsed_time("Operations Elapsed: {}".format(stopwatch.Elapsed))
 
-    def __is_required_family(self):
-        return self.__revit_repository.family_required(self.__view_model.category_name)
-
     def __get_phase_name(self, element):
         return self.__revit_repository.get_phase(element)
-
-    def __get_family(self, element):
-        return self.__revit_repository.get_family(element)
-
-    def __family_required(self, category):
-        return self.__revit_repository.family_required(category)
 
 
 class SelectLineCommand(ICommand):
