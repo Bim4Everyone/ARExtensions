@@ -242,50 +242,34 @@ class RevitRepository:
         self.__elements = [element for element in selection.get_selection().elements
             if element.LevelId == document.ActiveView.GenLevel.Id]
 
-        self.__room_elements = self.get_elements(self.get_category_name(BuiltInCategory.OST_Rooms))
+        self.__room_elements = self.get_elements(BuiltInCategory.OST_Rooms)
 
     @property
     def is_empty(self):
         return not self.__room_elements
 
-    def get_category(self, category):
-        return self.__document.Settings.Categories.Item[category]
+    def get_phases(self):
+        return set(sorted((self.get_phase(element) for element in self.__room_elements)))
 
-    def get_phases(self, category):
-        elements = self.get_elements(category)
-        return set(sorted((self.get_phase(element) for element in elements)))
-
-    def get_params(self, category):
-        element = get_next(self.get_elements(category), None)
+    def get_params(self):
+        element = get_next(self.__room_elements, None)
         if element:
             return set(sorted((param.Definition.Name for param in element.Parameters if param.StorageType == StorageType.String)))
-
         return set()
 
     def get_elements(self, category):
-        if category and isinstance(category, str):
-            category = self.get_category(category)
-            return [element for element in self.__elements if element.Category.Id == category.Id]
+        category = Category.GetCategory(self.__document, category)
+        return [element for element in self.__elements if element.Category.Id == category.Id]
 
-        if category == BuiltInCategory.OST_Rooms:
-            return self.__room_elements
+    def get_rooms(self):
+        return self.__room_elements
 
-        return set()
-
-    def get_default_param(self, category):
-        if category:
-            category = self.get_category(category)
-            if category.Id == ElementId(BuiltInCategory.OST_Rooms):
-                return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
+    def get_default_param(self):
+        return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
 
     @staticmethod
     def get_phase(element):
-        if element.Category.Id == ElementId(BuiltInCategory.OST_Rooms):
-            return element.GetParam(BuiltInParameter.ROOM_PHASE).AsValueString()
-
-    @staticmethod
-    def get_category_name(category):
-        return LabelUtils.GetLabelFor(category)
+        return element.GetParam(BuiltInParameter.ROOM_PHASE).AsValueString()
 
     @staticmethod
     def pick_element(title):
@@ -319,13 +303,11 @@ class MainWindowViewModel(Reactive):
         self.__param_names = []
         self.__param_name = None
 
-        self.__category_name = self.__revit_repository.get_category_name(BuiltInCategory.OST_Rooms)
-
-        self.phase_names = self.__revit_repository.get_phases(self.__category_name)
+        self.phase_names = self.__revit_repository.get_phases()
         self.phase_name = get_next(self.__phase_names, None)
 
-        self.param_name = self.__revit_repository.get_default_param(self.__category_name)
-        self.param_names = self.__revit_repository.get_params(self.__category_name)
+        self.param_name = self.__revit_repository.get_default_param()
+        self.param_names = self.__revit_repository.get_params()
 
     @property
     def element(self):
@@ -343,15 +325,6 @@ class MainWindowViewModel(Reactive):
     @element_name.setter
     def element_name(self, value):
         self.__element_name = value
-
-    @reactive
-    def category_name(self):
-        return self.__category_name
-
-    @category_name.setter
-    def category_name(self, value):
-        self.__category_name = value
-        self.OnUpdateCategory(self.__category_name)
 
     @reactive
     def phase_names(self):
@@ -456,10 +429,6 @@ class NumerateRoomsCommand(ICommand):
             self.__view_model.error_text = "Выбранный элемент должен быть линией."
             return False
 
-        if not self.__view_model.category_name:
-            self.__view_model.error_text = "Категория должна быть заполнена."
-            return False
-
         if not self.__view_model.phase_name:
             self.__view_model.error_text = "Стадия должна быть заполнена."
             return False
@@ -484,7 +453,7 @@ class NumerateRoomsCommand(ICommand):
         stopwatch = Stopwatch.StartNew()
 
         view_model = self.__view_model
-        elements = self.__revit_repository.get_elements(view_model.category_name)
+        elements = self.__revit_repository.get_rooms()
         elements = [element for element in elements if self.__get_phase_name(element) == view_model.phase_name]
 
         try:
