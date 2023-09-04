@@ -24,8 +24,10 @@ clr.ImportExtensions(dosymep.Bim4Everyone)
 from dosymep_libs.bim4everyone import *
 from dosymep.Bim4Everyone.ProjectParams import *
 
-doc = __revit__.ActiveUIDocument.Document
-uidoc = __revit__.ActiveUIDocument
+from rooms import RevitRepository
+
+
+document = __revit__.ActiveUIDocument.Document
 
 
 class MainWindow(WPFWindow):
@@ -85,7 +87,7 @@ class GeometryRoom:
 
     def get_group(self):
         if self.obj.GetParamValueOrDefault(self.group_param):
-            group = doc.GetElement(self.obj.GetParamValueOrDefault(self.group_param))
+            group = document.GetElement(self.obj.GetParamValueOrDefault(self.group_param))
             if group:
                 return group.Name
         return "<Без группы>"
@@ -141,11 +143,11 @@ class RoomsNumerator:
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
-    selection_ids = uidoc.Selection.GetElementIds()
-    selection = [doc.GetElement(i) for i in selection_ids]
-    rooms = [GeometryRoom(x) for x in selection if isinstance(x, Room)]
-    if not rooms:
-        alert("Необходимо выбрать помещения!", exitscript=True)
+    revit_repository = RevitRepository(document, __revit__)
+    if revit_repository.is_empty:
+        alert("Выберите помещения для нумерации", exitscript=True)
+
+    rooms = [GeometryRoom(x) for x in revit_repository.get_rooms()]
 
     groups = {r.get_group() for r in rooms}
     groups = sorted(groups)

@@ -29,6 +29,8 @@ from dosymep.Bim4Everyone.ProjectParams import *
 
 from dosymep_libs.bim4everyone import *
 
+from rooms import RevitRepository, get_next
+
 log_debug = False
 log_point_debug = False
 log_elapsed_time_debug = False
@@ -53,10 +55,6 @@ def log_point(message):
 def log_elapsed_time(message):
     if log_elapsed_time_debug:
         print message
-
-
-def get_next(enumerable, default):
-    return next((e for e in enumerable), default)
 
 
 def is_int(value):
@@ -234,59 +232,13 @@ class MainWindow(forms.WPFWindow):
         self.MinHeight = self.Height
 
 
-class RevitRepository:
-    def __init__(self, document, ui_application):
-        self.__document = document
-        self.__application = ui_application
-
-        self.__elements = [element for element in selection.get_selection().elements
-            if element.LevelId == document.ActiveView.GenLevel.Id]
-
-        self.__room_elements = self.get_elements(BuiltInCategory.OST_Rooms)
-
-    @property
-    def is_empty(self):
-        return not self.__room_elements
-
-    def get_phases(self):
-        return set(sorted((self.get_phase(element) for element in self.__room_elements)))
-
-    def get_params(self):
-        element = get_next(self.__room_elements, None)
-        if element:
-            return set(sorted((param.Definition.Name for param in element.Parameters if param.StorageType == StorageType.String)))
-        return set()
-
-    def get_elements(self, category):
-        category = Category.GetCategory(self.__document, category)
-        return [element for element in self.__elements if element.Category.Id == category.Id]
-
-    def get_rooms(self):
-        return self.__room_elements
-
-    def get_default_param(self):
-        return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
-
-    @staticmethod
-    def get_phase(element):
-        return element.GetParam(BuiltInParameter.ROOM_PHASE).AsValueString()
-
-    @staticmethod
-    def pick_element(title):
-        with forms.WarningBar(title=title):
-            return selection.pick_element(title)
-
-
 class MainWindowViewModel(Reactive):
-    def __init__(self, view, *args):
+    def __init__(self, revit_repository, view, *args):
         Reactive.__init__(self, *args)
 
         self.__curve = None
         self.__element_name = None
-        self.__revit_repository = RevitRepository(document, __revit__)
-
-        if self.__revit_repository.is_empty:
-            forms.alert("Выберите помещения для нумерации", exitscript=True)
+        self.__revit_repository = revit_repository
 
         self.start_number = "1"
 
@@ -384,6 +336,7 @@ class MainWindowViewModel(Reactive):
 
     @reactive
     def error_text(self):
+        return self.__error_text
         return self.__error_text
 
     @error_text.setter
@@ -518,8 +471,12 @@ class SelectLineCommand(ICommand):
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
+    revit_repository = RevitRepository(document, __revit__)
+    if revit_repository.is_empty:
+        forms.alert("Выберите помещения для нумерации", exitscript=True)
+
     main_window = MainWindow()
-    main_window.DataContext = MainWindowViewModel(main_window)
+    main_window.DataContext = MainWindowViewModel(revit_repository, main_window)
     if not main_window.show_dialog():
         script.exit()
 
