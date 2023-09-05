@@ -13,10 +13,11 @@ from System.Diagnostics import Stopwatch
 from System.Windows.Input import ICommand
 from Autodesk.Revit.DB import *
 
-from pyrevit import forms
+# from pyrevit import forms
+from pyrevit.forms import *
 from pyrevit import EXEC_PARAMS
 from pyrevit import revit
-from pyrevit.forms import Reactive, reactive
+# from pyrevit.forms import Reactive, reactive
 from pyrevit.revit import selection, HOST_APP
 
 import dosymep
@@ -29,7 +30,7 @@ from dosymep.Bim4Everyone.ProjectParams import *
 
 from dosymep_libs.bim4everyone import *
 
-from rooms import RevitRepository, get_next
+from rooms import RevitRepository, RoomGroup, SelectRoomGroupsWindow, GeometryRoom, get_next
 
 log_debug = False
 log_point_debug = False
@@ -101,29 +102,6 @@ def convert_value(value):
         return UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Millimeters)
 
 
-def is_intersect_room(room_element, curve_element):
-    if not hasattr(room_element, "GetBoundarySegments"):
-        return True
-    else:
-        segments = room_element.GetBoundarySegments(SpatialElementBoundaryOptions())
-        segments = [segment for inner_segments in segments
-                    for segment in inner_segments]
-
-        for segment in segments:
-            curve = segment.GetCurve()
-
-            start = curve.GetEndPoint(0)
-            finish = curve.GetEndPoint(1)
-
-            point = curve_element.GeometryCurve.GetEndPoint(0)
-            start = XYZ(start.X, start.Y, point.Z)
-            finish = XYZ(finish.X, finish.Y, point.Z)
-
-            line = Line.CreateBound(start, finish)
-            if line.Intersect(curve_element.GeometryCurve) == SetComparisonResult.Overlap:
-                return True
-
-
 def get_index_point(element, index_points):
     return next((index_point for index_point in index_points if index_point.PassesFilter(element)), None)
 
@@ -188,9 +166,9 @@ def get_index_elements(curve, elements):
         index_points = sorted(index_points, key=lambda x: x.Index)
 
         for room in elements:
-            index_point = get_index_point(room, index_points)
+            index_point = get_index_point(room.room_obj, index_points)
             if index_point:
-                yield IndexElement(index_point.Index, room)
+                yield IndexElement(index_point.Index, room.room_obj)
 
 
 class IndexElement:
@@ -213,7 +191,7 @@ class IndexElementPoint(IndexElement):
         return BoundingBoxContainsPointFilter(point).PassesFilter(element)
 
 
-class MainWindow(forms.WPFWindow):
+class MainWindow(WPFWindow):
     def __init__(self, ):
         self._context = None
         self.xaml_source = op.join(op.dirname(__file__), 'MainWindow.xaml')
@@ -262,11 +240,11 @@ class MainWindowViewModel(Reactive):
         self.param_names = self.__revit_repository.get_params()
 
     @property
-    def element(self):
+    def curve_element(self):
         return self.__curve
 
-    @element.setter
-    def element(self, value):
+    @curve_element.setter
+    def curve_element(self, value):
         self.__curve = value
         self.element_name = "{} ({})".format(str(self.__curve.Id.IntegerValue), self.__curve.Category.Name) if self.__curve else None
 
@@ -337,7 +315,6 @@ class MainWindowViewModel(Reactive):
     @reactive
     def error_text(self):
         return self.__error_text
-        return self.__error_text
 
     @error_text.setter
     def error_text(self, value):
@@ -374,11 +351,11 @@ class NumerateRoomsCommand(ICommand):
         self.OnCanExecuteChanged()
 
     def CanExecute(self, parameter):
-        if not self.__view_model.element:
+        if not self.__view_model.curve_element:
             self.__view_model.error_text = "Выберите линию."
             return False
 
-        if not isinstance(self.__view_model.element, CurveElement):
+        if not isinstance(self.__view_model.curve_element, CurveElement):
             self.__view_model.error_text = "Выбранный элемент должен быть линией."
             return False
 
@@ -407,12 +384,12 @@ class NumerateRoomsCommand(ICommand):
 
         view_model = self.__view_model
         elements = self.__revit_repository.get_rooms()
-        elements = [element for element in elements if self.__get_phase_name(element) == view_model.phase_name]
+        elements = [element for element in elements if self.__get_phase_name(element.room_obj) == view_model.phase_name]
 
         try:
-            curve = view_model.element.Location.Curve
+            curve = view_model.curve_element.Location.Curve
             elements = [element for element in elements
-                        if is_intersect_room(element, view_model.element)]
+                        if element.is_intersect_room(view_model.curve_element)]
 
             with revit.Transaction("BIM: Нумерация по линии"):
                 index_elements = get_index_elements(curve, elements)
@@ -429,7 +406,7 @@ class NumerateRoomsCommand(ICommand):
                                                                         index))
 
                         index += 1
-                forms.alert("Последний назначенный номер: {}".format(index-1))
+                alert("Последний назначенный номер: {}".format(index-1))
 
         finally:
             stopwatch.Stop()
@@ -463,7 +440,7 @@ class SelectLineCommand(ICommand):
     def Execute(self, parameter):
         self.__view.Hide()
         try:
-            self.__view_model.element = self.__revit_repository.pick_element("Выберите линию.")
+            self.__view_model.curve_element = self.__revit_repository.pick_element("Выберите линию.")
         finally:
             self.__view.show_dialog()
 
@@ -473,12 +450,21 @@ class SelectLineCommand(ICommand):
 def script_execute(plugin_logger):
     revit_repository = RevitRepository(document, __revit__)
     if revit_repository.is_empty:
-        forms.alert("Выберите помещения для нумерации", exitscript=True)
+        alert("Выберите помещения для нумерации", exitscript=True)
 
-    main_window = MainWindow()
-    main_window.DataContext = MainWindowViewModel(revit_repository, main_window)
-    if not main_window.show_dialog():
-        script.exit()
+    groups = revit_repository.get_rooms_groups()
+
+    select_groups_window = SelectRoomGroupsWindow(groups)
+    select_groups_window.show_dialog()
+    selected_groups = select_groups_window.selected_groups
+
+    filtered_rooms = revit_repository.get_filtered_room_by_group(selected_groups)
+
+    if filtered_rooms:
+        main_window = MainWindow()
+        main_window.DataContext = MainWindowViewModel(revit_repository, main_window)
+        if not main_window.show_dialog():
+            script.exit()
 
 
 script_execute()

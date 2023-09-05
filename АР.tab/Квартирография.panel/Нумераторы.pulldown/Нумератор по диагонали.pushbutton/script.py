@@ -12,7 +12,6 @@ clr.AddReference("System.Windows.Forms")
 from pyrevit.forms import *
 from pyrevit import EXEC_PARAMS
 
-from Autodesk.Revit.DB.Architecture import Room
 from Autodesk.Revit.DB import *
 
 from pyrevit import revit
@@ -24,76 +23,10 @@ clr.ImportExtensions(dosymep.Bim4Everyone)
 from dosymep_libs.bim4everyone import *
 from dosymep.Bim4Everyone.ProjectParams import *
 
-from rooms import RevitRepository
+from rooms import RevitRepository, RoomGroup, SelectRoomGroupsWindow, GeometryRoom
 
 
 document = __revit__.ActiveUIDocument.Document
-
-
-class MainWindow(WPFWindow):
-    def __init__(self, groups):
-        self._context = None
-        self.xaml_source = op.join(op.dirname(__file__), 'MainWindow.xaml')
-        super(MainWindow, self).__init__(self.xaml_source)
-
-        self.RoomGroups.ItemsSource = groups
-        self.selected_groups = None
-
-    def filter_groups(self, sender, args):
-        self.selected_groups = [x.name for x in self.RoomGroups.Items if x.is_checked]
-        self.Close()
-
-    def update_states(self, value):
-        for group in self.RoomGroups.ItemsSource:
-            group.is_checked = value
-
-    def select_all(self, sender, args):
-        self.update_states(True)
-
-    def deselect_all(self, sender, args):
-        self.update_states(False)
-
-    def invert(self, sender, args):
-        for group in self.RoomGroups.ItemsSource:
-            group.is_checked = not (group.is_checked)
-
-
-class RoomGroup(Reactive):
-    def __init__(self, group):
-        self.name = group
-        self.__is_checked = True
-
-    @reactive
-    def is_checked(self):
-        return self.__is_checked
-
-    @is_checked.setter
-    def is_checked(self, value):
-        self.__is_checked = value
-
-
-class GeometryRoom:
-    def __init__(self, obj):
-        self.x = obj.Location.Point.X
-        self.y = obj.Location.Point.Y
-        self.obj = obj
-        self.group_param = ProjectParamsConfig.Instance.RoomGroupName
-
-    def set_num(self, num):
-        self.obj.Number = num
-
-    def get_num(self):
-        return self.obj.Number
-
-    def get_group(self):
-        if self.obj.GetParamValueOrDefault(self.group_param):
-            group = document.GetElement(self.obj.GetParamValueOrDefault(self.group_param))
-            if group:
-                return group.Name
-        return "<Без группы>"
-
-    def get_range(self, direction):
-        return self.x * direction.X - self.y * direction.Y
 
 
 class NumerateInfo:
@@ -119,7 +52,7 @@ class RoomsNumerator:
         rooms = [x for x in self.rooms_revit]
 
         for room in rooms:
-            if room.obj.GetParamValueOrDefault(ProjectParamsConfig.Instance.IsRoomNumberFix):
+            if room.room_obj.GetParamValueOrDefault(ProjectParamsConfig.Instance.IsRoomNumberFix):
                 self.placed_number.append(room.get_num())
             else:
                 self.rooms_to_num.append(room)
@@ -147,23 +80,13 @@ def script_execute(plugin_logger):
     if revit_repository.is_empty:
         alert("Выберите помещения для нумерации", exitscript=True)
 
-    rooms = [GeometryRoom(x) for x in revit_repository.get_rooms()]
+    groups = revit_repository.get_rooms_groups()
 
-    groups = {r.get_group() for r in rooms}
-    groups = sorted(groups)
-    groups = {RoomGroup(x) for x in groups}
+    select_groups_window = SelectRoomGroupsWindow(groups)
+    select_groups_window.show_dialog()
+    selected_groups = select_groups_window.selected_groups
 
-    main_window = MainWindow(groups)
-    main_window.show_dialog()
-    filtered_groups = main_window.selected_groups
-
-    filtered_rooms = []
-    if filtered_groups:
-        for room in rooms:
-            if room.get_group() in filtered_groups:
-                filtered_rooms.append(room)
-    else:
-        script.exit()
+    filtered_rooms = revit_repository.get_filtered_room_by_group(selected_groups)
 
     if filtered_rooms:
         form = RenumerateVectorForm()
