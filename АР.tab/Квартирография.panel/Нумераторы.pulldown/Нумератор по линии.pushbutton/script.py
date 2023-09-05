@@ -227,14 +227,8 @@ class MainWindowViewModel(Reactive):
         self.__numerate_command = NumerateRoomsCommand(self, self.__revit_repository)
         self.__select_line_command = SelectLineCommand(view, self, self.__revit_repository)
 
-        self.__phase_names = []
-        self.__phase_name = None
-
         self.__param_names = []
         self.__param_name = None
-
-        self.phase_names = self.__revit_repository.get_phases()
-        self.phase_name = get_next(self.__phase_names, None)
 
         self.param_name = self.__revit_repository.get_default_param()
         self.param_names = self.__revit_repository.get_params()
@@ -255,22 +249,6 @@ class MainWindowViewModel(Reactive):
     @element_name.setter
     def element_name(self, value):
         self.__element_name = value
-
-    @reactive
-    def phase_names(self):
-        return self.__phase_names
-
-    @phase_names.setter
-    def phase_names(self, value):
-        self.__phase_names = value
-
-    @reactive
-    def phase_name(self):
-        return self.__phase_name
-
-    @phase_name.setter
-    def phase_name(self, value):
-        self.__phase_name = value
 
     @reactive
     def start_number(self):
@@ -359,10 +337,6 @@ class NumerateRoomsCommand(ICommand):
             self.__view_model.error_text = "Выбранный элемент должен быть линией."
             return False
 
-        if not self.__view_model.phase_name:
-            self.__view_model.error_text = "Стадия должна быть заполнена."
-            return False
-
         if not self.__view_model.param_name:
             self.__view_model.error_text = "Параметр должен быть заполнен."
             return False
@@ -384,7 +358,6 @@ class NumerateRoomsCommand(ICommand):
 
         view_model = self.__view_model
         elements = self.__revit_repository.get_rooms()
-        elements = [element for element in elements if self.__get_phase_name(element.room_obj) == view_model.phase_name]
 
         try:
             curve = view_model.curve_element.Location.Curve
@@ -411,9 +384,6 @@ class NumerateRoomsCommand(ICommand):
         finally:
             stopwatch.Stop()
             log_elapsed_time("Operations Elapsed: {}".format(stopwatch.Elapsed))
-
-    def __get_phase_name(self, element):
-        return self.__revit_repository.get_phase(element)
 
 
 class SelectLineCommand(ICommand):

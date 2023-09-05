@@ -91,9 +91,6 @@ class RevitRepository:
     def is_empty(self):
         return not self.__room_elements
 
-    def get_phases(self):
-        return set(sorted((self.get_phase(element.room_obj) for element in self.__room_elements)))
-
     def get_params(self):
         element = get_next(self.__room_elements, None)
         if element:
@@ -110,17 +107,12 @@ class RevitRepository:
     def get_filtered_room_by_group(self, selected_groups):
         return [x for x in self.__room_elements if x.get_group() in selected_groups]
 
-
     def get_rooms_groups(self):
         groups = set(r.get_group() for r in self.__room_elements)
         return sorted(groups, key=lambda x: x.name)
 
     def get_default_param(self):
         return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
-
-    @staticmethod
-    def get_phase(element):
-        return element.GetParam(BuiltInParameter.ROOM_PHASE).AsValueString()
 
     @staticmethod
     def pick_element(title):
