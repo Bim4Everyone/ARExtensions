@@ -5,7 +5,6 @@ clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
 
 import math
-import os.path as op
 import pyevent  # pylint: disable=import-error
 
 import System
@@ -13,24 +12,19 @@ from System.Diagnostics import Stopwatch
 from System.Windows.Input import ICommand
 from Autodesk.Revit.DB import *
 
-# from pyrevit import forms
 from pyrevit.forms import *
 from pyrevit import EXEC_PARAMS
 from pyrevit import revit
-# from pyrevit.forms import Reactive, reactive
 from pyrevit.revit import selection, HOST_APP
 
 import dosymep
 clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
 
-from dosymep.Bim4Everyone.SharedParams import *
-from dosymep.Bim4Everyone.SystemParams import *
 from dosymep.Bim4Everyone.ProjectParams import *
-
 from dosymep_libs.bim4everyone import *
 
-from rooms import RevitRepository, RoomGroup, SelectRoomGroupsWindow, GeometryRoom, get_next
+from rooms import *
 
 log_debug = False
 log_point_debug = False
@@ -84,15 +78,6 @@ def create_circle(radius, location):
         arc = Arc.Create(plane, radius, 0, 2 * math.pi)
 
         return document.Create.NewDetailCurve(document.ActiveView, arc)
-
-
-def distinct(source, action):
-    seen = set()
-    for element in source:
-        action_result = action(element)
-        if not action_result in seen:
-            seen.add(action_result)
-            yield element
 
 
 def convert_value(value):
@@ -215,7 +200,7 @@ class MainWindowViewModel(Reactive):
         Reactive.__init__(self, *args)
 
         self.__curve = None
-        self.__element_name = None
+        self.__selected_elem_name = None
         self.__revit_repository = revit_repository
 
         self.start_number = "1"
@@ -240,15 +225,15 @@ class MainWindowViewModel(Reactive):
     @curve_element.setter
     def curve_element(self, value):
         self.__curve = value
-        self.element_name = "{} ({})".format(str(self.__curve.Id.IntegerValue), self.__curve.Category.Name) if self.__curve else None
+        self.selected_elem_name = "{} ({})".format(str(self.__curve.Id.IntegerValue), self.__curve.Category.Name) if self.__curve else None
 
     @reactive
-    def element_name(self):
-        return self.__element_name
+    def selected_elem_name(self):
+        return self.__selected_elem_name
 
-    @element_name.setter
-    def element_name(self, value):
-        self.__element_name = value
+    @selected_elem_name.setter
+    def selected_elem_name(self, value):
+        self.__selected_elem_name = value
 
     @reactive
     def start_number(self):
@@ -357,7 +342,7 @@ class NumerateRoomsCommand(ICommand):
         stopwatch = Stopwatch.StartNew()
 
         view_model = self.__view_model
-        elements = self.__revit_repository.get_rooms()
+        elements = self.__revit_repository.get_filtered_rooms_by_group()
 
         try:
             curve = view_model.curve_element.Location.Curve
@@ -370,11 +355,13 @@ class NumerateRoomsCommand(ICommand):
 
                 index = int(view_model.start_number)
                 for index_element in index_elements:
-                    if not index_element.Element.GetParamValueOrDefault(ProjectParamsConfig.Instance.IsRoomNumberFix):
+                    if not index_element.Element\
+                            .GetParamValueOrDefault(ProjectParamsConfig.Instance.IsRoomNumberFix):
                         index_element.Element.SetParamValue(view_model.param_name,
                                                    view_model.prefix + str(index) + view_model.suffix)
                         log_information(
-                            "Id: {} ComputedIndex: {} Index: {}".format(output.linkify(index_element.Element.Id),
+                            "Id: {} ComputedIndex: {} Index: {}"
+                            .format(output.linkify(index_element.Element.Id),
                                                                         index_element.Index,
                                                                         index))
 
@@ -422,19 +409,15 @@ def script_execute(plugin_logger):
     if revit_repository.is_empty:
         alert("Выберите помещения для нумерации", exitscript=True)
 
-    groups = revit_repository.get_rooms_groups()
-
-    select_groups_window = SelectRoomGroupsWindow(groups)
+    select_groups_window = SelectRoomGroupsWindow(revit_repository.room_groups)
     select_groups_window.show_dialog()
-    selected_groups = select_groups_window.selected_groups
+    if not revit_repository.get_filtered_rooms_by_group():
+        script.exit()
 
-    filtered_rooms = revit_repository.get_filtered_room_by_group(selected_groups)
-
-    if filtered_rooms:
-        main_window = MainWindow()
-        main_window.DataContext = MainWindowViewModel(revit_repository, main_window)
-        if not main_window.show_dialog():
-            script.exit()
+    main_window = MainWindow()
+    main_window.DataContext = MainWindowViewModel(revit_repository, main_window)
+    if not main_window.show_dialog():
+        script.exit()
 
 
 script_execute()

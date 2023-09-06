@@ -4,17 +4,9 @@ import clr
 clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
 
-import os.path as op
-import pyevent  # pylint: disable=import-error
-
-import System
-from System.Diagnostics import Stopwatch
-from System.Windows.Input import ICommand
 from Autodesk.Revit.DB import *
 
 from pyrevit.forms import *
-from pyrevit import EXEC_PARAMS
-from pyrevit import revit
 from pyrevit.forms import Reactive, reactive
 from pyrevit.revit import selection, HOST_APP
 
@@ -24,10 +16,51 @@ import dosymep
 clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
 
-from dosymep_libs.bim4everyone import *
-
-
 document = __revit__.ActiveUIDocument.Document  # type: Document
+
+
+class RevitRepository:
+    def __init__(self, document, ui_application):
+        self.__document = document
+        self.__application = ui_application
+
+        self.__elements = [element for element in selection.get_selection().elements
+            if element.LevelId == document.ActiveView.GenLevel.Id]
+
+        self.__room_elements = self.get_geometry_elements(BuiltInCategory.OST_Rooms)
+        self.__filtered_rooms_by_group = []
+
+        self.room_groups = self.get_rooms_groups()
+
+    @property
+    def is_empty(self):
+        return not self.__room_elements
+
+    def get_params(self):
+        element = get_next(self.__room_elements, None)
+        if element:
+            return set(sorted((param.Definition.Name for param in element.room_obj.Parameters if param.StorageType == StorageType.String)))
+        return set()
+
+    def get_geometry_elements(self, category):
+        category = Category.GetCategory(self.__document, category)
+        return [GeometryRoom(element) for element in self.__elements if element.Category.Id == category.Id]
+
+    def get_filtered_rooms_by_group(self):
+        selected_groups = [x for x in self.room_groups if x.is_checked]
+        return [x for x in self.__room_elements if x.get_group() in selected_groups]
+
+    def get_rooms_groups(self):
+        groups = set(r.get_group() for r in self.__room_elements)
+        return sorted(groups, key=lambda x: x.name)
+
+    def get_default_param(self):
+        return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
+
+    @staticmethod
+    def pick_element(title):
+        with WarningBar(title=title):
+            return selection.pick_element(title)
 
 
 class GeometryRoom:
@@ -77,49 +110,6 @@ class GeometryRoom:
                     return True
 
 
-class RevitRepository:
-    def __init__(self, document, ui_application):
-        self.__document = document
-        self.__application = ui_application
-
-        self.__elements = [element for element in selection.get_selection().elements
-            if element.LevelId == document.ActiveView.GenLevel.Id]
-
-        self.__room_elements = self.get_geometry_elements(BuiltInCategory.OST_Rooms)
-
-    @property
-    def is_empty(self):
-        return not self.__room_elements
-
-    def get_params(self):
-        element = get_next(self.__room_elements, None)
-        if element:
-            return set(sorted((param.Definition.Name for param in element.room_obj.Parameters if param.StorageType == StorageType.String)))
-        return set()
-
-    def get_geometry_elements(self, category):
-        category = Category.GetCategory(self.__document, category)
-        return [GeometryRoom(element) for element in self.__elements if element.Category.Id == category.Id]
-
-    def get_rooms(self):
-        return self.__room_elements
-
-    def get_filtered_room_by_group(self, selected_groups):
-        return [x for x in self.__room_elements if x.get_group() in selected_groups]
-
-    def get_rooms_groups(self):
-        groups = set(r.get_group() for r in self.__room_elements)
-        return sorted(groups, key=lambda x: x.name)
-
-    def get_default_param(self):
-        return LabelUtils.GetLabelFor(BuiltInParameter.ROOM_NUMBER)
-
-    @staticmethod
-    def pick_element(title):
-        with WarningBar(title=title):
-            return selection.pick_element(title)
-
-
 class RoomGroup(Reactive):
     def __init__(self, group_name):
         self.name = group_name
@@ -150,10 +140,8 @@ class SelectRoomGroupsWindow(WPFWindow):
         super(SelectRoomGroupsWindow, self).__init__(self.xaml_source)
 
         self.RoomGroups.ItemsSource = groups
-        self.selected_groups = None
 
     def filter_groups(self, sender, args):
-        self.selected_groups = [x for x in self.RoomGroups.Items if x.is_checked]
         self.Close()
 
     def update_states(self, value):
@@ -168,7 +156,7 @@ class SelectRoomGroupsWindow(WPFWindow):
 
     def invert(self, sender, args):
         for group in self.RoomGroups.ItemsSource:
-            group.is_checked = not (group.is_checked)
+            group.is_checked = not group.is_checked
 
 
 def get_next(enumerable, default):

@@ -7,12 +7,8 @@ clr.AddReference("dosymep.Bim4Everyone.dll")
 clr.AddReference("FormsCollector")
 from FormsCollector import RenumerateVectorForm
 
-clr.AddReference("System.Windows.Forms")
-
 from pyrevit.forms import *
 from pyrevit import EXEC_PARAMS
-
-from Autodesk.Revit.DB import *
 
 from pyrevit import revit
 
@@ -23,7 +19,7 @@ clr.ImportExtensions(dosymep.Bim4Everyone)
 from dosymep_libs.bim4everyone import *
 from dosymep.Bim4Everyone.ProjectParams import *
 
-from rooms import RevitRepository, RoomGroup, SelectRoomGroupsWindow, GeometryRoom
+from rooms import *
 
 
 document = __revit__.ActiveUIDocument.Document
@@ -80,24 +76,21 @@ def script_execute(plugin_logger):
     if revit_repository.is_empty:
         alert("Выберите помещения для нумерации", exitscript=True)
 
-    groups = revit_repository.get_rooms_groups()
-
-    select_groups_window = SelectRoomGroupsWindow(groups)
+    select_groups_window = SelectRoomGroupsWindow(revit_repository.room_groups)
     select_groups_window.show_dialog()
-    selected_groups = select_groups_window.selected_groups
+    filtered_rooms = revit_repository.get_filtered_rooms_by_group()
+    if not filtered_rooms:
+        script.exit()
 
-    filtered_rooms = revit_repository.get_filtered_room_by_group(selected_groups)
+    form = RenumerateVectorForm()
+    result = form.ShowDialog()
+    if not result:
+        script.exit()
 
-    if filtered_rooms:
-        form = RenumerateVectorForm()
-        result = form.ShowDialog()
-        if not result:
-            script.exit()
+    numerate_info = NumerateInfo(form)
 
-        numerate_info = NumerateInfo(form)
-
-        rooms_numerator = RoomsNumerator(numerate_info, filtered_rooms)
-        rooms_numerator.renumber_rooms()
+    rooms_numerator = RoomsNumerator(numerate_info, filtered_rooms)
+    rooms_numerator.renumber_rooms()
 
 
 script_execute()
