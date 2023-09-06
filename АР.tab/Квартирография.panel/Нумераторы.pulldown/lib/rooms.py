@@ -87,7 +87,7 @@ class GeometryRoom:
     def get_range(self, direction):
         return self.x * direction.X - self.y * direction.Y
 
-    def is_intersect_room(self, curve_element):
+    def is_intersect_curve(self, curve_element):
         if not hasattr(self.room_obj, "GetBoundarySegments"):
             return True
         else:

@@ -209,6 +209,7 @@ class MainWindowViewModel(Reactive):
         self.__suffix = ""
 
         self.__error_text = ""
+
         self.__numerate_command = NumerateRoomsCommand(self, self.__revit_repository)
         self.__select_line_command = SelectLineCommand(view, self, self.__revit_repository)
 
@@ -347,18 +348,20 @@ class NumerateRoomsCommand(ICommand):
         try:
             curve = view_model.curve_element.Location.Curve
             elements = [element for element in elements
-                        if element.is_intersect_room(view_model.curve_element)]
+                        if element.is_intersect_curve(view_model.curve_element)]
+            fix_param = ProjectParamsConfig.Instance.IsRoomNumberFix
 
             with revit.Transaction("BIM: Нумерация по линии"):
                 index_elements = get_index_elements(curve, elements)
                 index_elements = sorted(index_elements, key=lambda x: x.Index)
 
                 index = int(view_model.start_number)
+
                 for index_element in index_elements:
-                    if not index_element.Element\
-                            .GetParamValueOrDefault(ProjectParamsConfig.Instance.IsRoomNumberFix):
-                        index_element.Element.SetParamValue(view_model.param_name,
-                                                   view_model.prefix + str(index) + view_model.suffix)
+                    if not index_element.Element.GetParamValueOrDefault(fix_param):
+                        value = view_model.prefix + str(index) + view_model.suffix
+                        index_element.Element.SetParamValue(view_model.param_name, value)
+
                         log_information(
                             "Id: {} ComputedIndex: {} Index: {}"
                             .format(output.linkify(index_element.Element.Id),

@@ -64,8 +64,8 @@ class RoomsNumerator:
                     number += 1
                 number = str(number)
                 self.placed_number.append(number)
-                name = "{}{}{}".format(self.prefix, number, self.suffix)
-                room.set_num(name)
+                value = self.prefix + number + self.suffix
+                room.set_num(value)
             alert("Последний назначенный номер: {}".format(number))
 
 
