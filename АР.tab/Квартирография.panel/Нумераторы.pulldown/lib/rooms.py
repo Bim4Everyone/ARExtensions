@@ -111,6 +111,10 @@ class GeometryRoom:
 
 
 class RoomGroup(Reactive):
+    """
+    Class for room groups.
+    Methods for comparison groups are overriden for comparison by names.
+    """
     def __init__(self, group_name):
         self.name = group_name
         self.__is_checked = True
@@ -134,6 +138,9 @@ class RoomGroup(Reactive):
 
 
 class SelectRoomGroupsWindow(WPFWindow):
+    """
+    Window for filtering rooms by their group
+    """
     def __init__(self, groups):
         self._context = None
         self.xaml_source = op.join(op.dirname(__file__), 'SelectRoomGroupsWindow.xaml')
