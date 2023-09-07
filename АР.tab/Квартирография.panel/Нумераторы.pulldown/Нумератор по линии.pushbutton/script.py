@@ -414,7 +414,7 @@ def script_execute(plugin_logger):
 
     select_groups_window = SelectRoomGroupsWindow(revit_repository.room_groups)
     select_groups_window.show_dialog()
-    if not revit_repository.get_filtered_rooms_by_group():
+    if not revit_repository.get_filtered_rooms_by_group() or not select_groups_window.DialogResult:
         script.exit()
 
     main_window = MainWindow()

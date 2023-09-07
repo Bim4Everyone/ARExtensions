@@ -79,7 +79,7 @@ def script_execute(plugin_logger):
     select_groups_window = SelectRoomGroupsWindow(revit_repository.room_groups)
     select_groups_window.show_dialog()
     filtered_rooms = revit_repository.get_filtered_rooms_by_group()
-    if not filtered_rooms:
+    if not filtered_rooms or not select_groups_window.DialogResult:
         script.exit()
 
     form = RenumerateVectorForm()

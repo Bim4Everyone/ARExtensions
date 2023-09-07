@@ -78,8 +78,9 @@ class GeometryRoom:
         return self.room_obj.Number
 
     def get_group(self):
-        if self.room_obj.GetParamValueOrDefault(self.group_param):
-            group = document.GetElement(self.room_obj.GetParamValueOrDefault(self.group_param))
+        group_id = self.room_obj.GetParamValueOrDefault(self.group_param)
+        if group_id:
+            group = document.GetElement(group_id)
             if group:
                 return RoomGroup(group.Name)
         return RoomGroup("<Без группы>")
@@ -88,26 +89,23 @@ class GeometryRoom:
         return self.x * direction.X - self.y * direction.Y
 
     def is_intersect_curve(self, curve_element):
-        if not hasattr(self.room_obj, "GetBoundarySegments"):
-            return True
-        else:
-            segments = self.room_obj.GetBoundarySegments(SpatialElementBoundaryOptions())
-            segments = [segment for inner_segments in segments
-                        for segment in inner_segments]
+        segments = self.room_obj.GetBoundarySegments(SpatialElementBoundaryOptions())
+        segments = [segment for inner_segments in segments
+                    for segment in inner_segments]
 
-            for segment in segments:
-                curve = segment.GetCurve()
+        for segment in segments:
+            curve = segment.GetCurve()
 
-                start = curve.GetEndPoint(0)
-                finish = curve.GetEndPoint(1)
+            start = curve.GetEndPoint(0)
+            finish = curve.GetEndPoint(1)
 
-                point = curve_element.GeometryCurve.GetEndPoint(0)
-                start = XYZ(start.X, start.Y, point.Z)
-                finish = XYZ(finish.X, finish.Y, point.Z)
+            point = curve_element.GeometryCurve.GetEndPoint(0)
+            start = XYZ(start.X, start.Y, point.Z)
+            finish = XYZ(finish.X, finish.Y, point.Z)
 
-                line = Line.CreateBound(start, finish)
-                if line.Intersect(curve_element.GeometryCurve) == SetComparisonResult.Overlap:
-                    return True
+            line = Line.CreateBound(start, finish)
+            if line.Intersect(curve_element.GeometryCurve) == SetComparisonResult.Overlap:
+                return True
 
 
 class RoomGroup(Reactive):
@@ -143,12 +141,14 @@ class SelectRoomGroupsWindow(WPFWindow):
     """
     def __init__(self, groups):
         self._context = None
+        # self.DialogResult = False
         self.xaml_source = op.join(op.dirname(__file__), 'SelectRoomGroupsWindow.xaml')
         super(SelectRoomGroupsWindow, self).__init__(self.xaml_source)
 
         self.RoomGroups.ItemsSource = groups
 
     def filter_groups(self, sender, args):
+        self.DialogResult = True
         self.Close()
 
     def update_states(self, value):
