@@ -7,3 +7,6 @@ tooltip:
   en_us: Deletes unused room names from key schedule
 
 author: sssenya
+
+min_revit_version: 2020
+max_revit_version: 2022

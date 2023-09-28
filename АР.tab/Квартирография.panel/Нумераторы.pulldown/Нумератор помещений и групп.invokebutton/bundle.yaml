@@ -16,3 +16,6 @@ assembly: RevitRooms.dll
 command_class: RoomsNumsCommand
 
 author: dosymep
+
+min_revit_version: 2020
+max_revit_version: 2022
