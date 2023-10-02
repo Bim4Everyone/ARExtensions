@@ -2,7 +2,7 @@
     "builtin": "False",
     "default_enabled": "True",
     "type": "extension",
-    "rocket_mode_compatible": "True",
+    "rocket_mode_compatible": "False",
     "name": "02.AR",
     "description": "Архитектура",
     "author": "dosymep",
