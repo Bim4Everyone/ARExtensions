@@ -1,0 +1,14 @@
+title:
+  ru: >-
+    КЖ Скрыть ненужные
+  en_us: >-
+    KJ Hide unwanted
+
+tooltip:
+  ru: Закрывает рабочие наборы из связей КР, в которых есть арматура.
+  en_us: Close worksets with reinforcement from KR links with reinforcement.
+
+author: vlastroG
+
+min_revit_version: 2020
+max_revit_version: 2022
