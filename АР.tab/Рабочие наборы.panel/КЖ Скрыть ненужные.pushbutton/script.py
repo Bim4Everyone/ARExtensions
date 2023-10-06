@@ -11,7 +11,6 @@ from dosymep_libs.bim4everyone import log_plugin
 from dosymep_libs.simple_services import notification
 
 document = __revit__.ActiveUIDocument.Document
-document_set = __revit__.Application.Documents
 
 
 @notification()
@@ -48,8 +47,9 @@ def script_execute(plugin_logger):
                     Autodesk.Revit.Exceptions.FileAccessException,
                     Autodesk.Revit.Exceptions.ForbiddenForDynamicUpdateException,
                     Autodesk.Revit.Exceptions.InvalidOperationException):
-                errors.append(link_type.Name)
+                errors.append(Element.Name.GetValue(link_type))
     if errors:
+        errors.insert(0, "Следующие связи не обработаны:")
         forms.alert("\n".join(errors), exitscript=True)
 
 
