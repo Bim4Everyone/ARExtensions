@@ -11,25 +11,27 @@ from dosymep_libs.bim4everyone import log_plugin
 from dosymep_libs.simple_services import notification
 
 document = __revit__.ActiveUIDocument.Document
+document_set = __revit__.Application.Documents
 
 
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
     links = FilteredElementCollector(document) \
-        .WhereElementIsElementType() \
-        .OfClass(RevitLinkType) \
+        .WhereElementIsNotElementType() \
+        .OfClass(RevitLinkInstance) \
         .ToElements()
-    loaded_links = [link for link in links if link.IsLoaded(document, link.Id)]
-    kr_links = [link for link in loaded_links if "_KR" in Element.Name.GetValue(link)]
+    loaded_link_instances = set([link for link in links if RevitLinkType.IsLoaded(document, link.GetTypeId())])
+    kr_links = [link for link in loaded_link_instances if "_KR" in link.Name]
 
     errors = []
-    for link in kr_links:
-        is_nested = link.IsNestedLink
+    for link_instance in kr_links:
+        link_type = document.GetElement(link_instance.GetTypeId())
+        is_nested = link_type.IsNestedLink
         if is_nested:
             continue
-        model_path = link.GetExternalFileReference().GetAbsolutePath()
-        is_workshared = BasicFileInfo.Extract(ModelPathUtils.ConvertModelPathToUserVisiblePath(model_path)).IsWorkshared
+        model_path = link_type.GetExternalFileReference().GetAbsolutePath()
+        is_workshared = link_instance.GetLinkDocument().IsWorkshared
 
         if (not is_nested) and is_workshared:
             worksets = WorksharingUtils.GetUserWorksetInfo(model_path)
@@ -41,12 +43,12 @@ def script_execute(plugin_logger):
             workset_configuration = WorksetConfiguration(WorksetConfigurationOption.CloseAllWorksets)
             workset_configuration.Open(workset_ids_to_open)
             try:
-                link.LoadFrom(model_path, workset_configuration)
+                link_type.LoadFrom(model_path, workset_configuration)
             except (Autodesk.Revit.Exceptions.ArgumentException,
                     Autodesk.Revit.Exceptions.FileAccessException,
                     Autodesk.Revit.Exceptions.ForbiddenForDynamicUpdateException,
                     Autodesk.Revit.Exceptions.InvalidOperationException):
-                errors.append(link.Name)
+                errors.append(link_type.Name)
     if errors:
         forms.alert("\n".join(errors), exitscript=True)
 
