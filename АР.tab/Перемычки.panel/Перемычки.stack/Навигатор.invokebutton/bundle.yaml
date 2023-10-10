@@ -10,4 +10,4 @@ assembly: RevitLintelPlacement.dll
 command_class: ViewLintelsCommand
 
 min_revit_version: 2020
-max_revit_version: 2022
+max_revit_version: 2024
