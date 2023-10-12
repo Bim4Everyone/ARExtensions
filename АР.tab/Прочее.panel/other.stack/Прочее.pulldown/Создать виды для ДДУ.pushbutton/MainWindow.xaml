@@ -4,82 +4,233 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:UpdateSelectedLinks"
-             Title="Показатели качества"
+             Title="Создание видов для ДДУ"
              mc:Ignorable="d"
              WindowStartupLocation="CenterScreen"
-             Height="500" Width="500"
-             MinHeight="350" MinWidth="500">
+             Height="700" Width="400"
+             MinHeight="700" MinWidth="400">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="30"/>
-            <RowDefinition Height="35" />
+            <RowDefinition Height="80"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="85" />
+            <RowDefinition Height="85" />
+            <RowDefinition Height="100" />
             <RowDefinition />
             <RowDefinition Height="45" />
         </Grid.RowDefinitions>
 
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="0.5*" />
-            <ColumnDefinition Width="0.5*"/>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <TextBlock
+
+        <GroupBox
             Grid.Row="0" Grid.Column="0"
-            Grid.ColumnSpan="3"
-            Margin="10,10,10,5"
-            TextWrapping="Wrap"
-            VerticalAlignment="Center"
-            Text="Тип таблицы"/>
-
-        <ComboBox
-            Grid.Row="1"
             Grid.ColumnSpan="2"
-            Margin="10,5,10,5"
-            ItemsSource="{Binding table_types}"
-            DisplayMemberPath="name"
-            SelectedItem="{Binding selected_table_type}"/>
+            Margin="10,5,10,2"
+            Header="Фильтрация выбранных видов по имени:">
 
-        <ListView
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="30" />
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock
+                    Grid.Row="0" Grid.Column="0"
+                    Margin="5,2,10,0"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="Фильтр 1:"/>
+
+                <TextBlock
+                    Grid.Row="0" Grid.Column="1"
+                    Margin="10,2,5,0"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="Фильтр 2:"/>
+
+                <TextBox
+                    Grid.Row="1" Grid.Column="0"
+                    Margin="5,0,10,2"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="{Binding view_name_filter_1}"/>
+
+                <TextBox
+                    Grid.Row="1" Grid.Column="1"
+                    Margin="10,0,5,2"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="{Binding view_name_filter_2}"/>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox
+            Grid.Row="1" Grid.Column="0"
+            Grid.ColumnSpan="2"
+            Margin="10,2,10,2"
+            Header="Области видимости:">
+
+            <StackPanel>
+                <TextBlock
+                    Margin="5,5,5,5"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="Выберите области видимости:"/>
+
+                <ListView
+                    Margin="5,5,5,5"
+                    Height="200"
+                    ItemsSource="{Binding volume_of_interest_items, UpdateSourceTrigger=PropertyChanged}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Width="30">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding is_checked}"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn
+                                Header="Области видимости" Width="290"
+                                DisplayMemberBinding="{Binding volumes_of_interest.Name}"/>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </StackPanel>
+        </GroupBox>
+
+
+        <GroupBox
             Grid.Row="2" Grid.Column="0"
-            Margin="10,5,5,5"
-            ItemsSource="{Binding buildings, UpdateSourceTrigger=PropertyChanged}">
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Width="30">
-                        <GridViewColumn.CellTemplate>
-                            <DataTemplate>
-                                <CheckBox IsChecked="{Binding is_checked}"/>
-                            </DataTemplate>
-                        </GridViewColumn.CellTemplate>
-                    </GridViewColumn>
-                    <GridViewColumn
-                        Header="Секции" Width="180"
-                        DisplayMemberBinding="{Binding number}"/>
-                </GridView>
-            </ListView.View>
-        </ListView>
+            Grid.ColumnSpan="2"
+            Margin="10,2,10,2"
+            Header="Шаблон вида:">
 
-        <ListView
-            Grid.Row="2" Grid.Column="1"
-            Margin="5,5,10,5"
-            ItemsSource="{Binding construction_sections, UpdateSourceTrigger=PropertyChanged}">
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Width="30">
-                        <GridViewColumn.CellTemplate>
-                            <DataTemplate>
-                                <CheckBox IsChecked="{Binding is_checked}"/>
-                            </DataTemplate>
-                        </GridViewColumn.CellTemplate>
-                    </GridViewColumn>
-                    <GridViewColumn
-                        Header="Разделы" Width="180"
-                        DisplayMemberBinding="{Binding number}"/>
-                </GridView>
-            </ListView.View>
-        </ListView>
+            <StackPanel>
+                <TextBlock
+                    Margin="5,5,5,5"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="Выберите шаблон вида:"/>
+
+                <ComboBox
+                    Margin="5,5,5,5"
+                    DisplayMemberPath="Name"
+                    ItemsSource="{Binding view_templates}"
+                    SelectedItem="{Binding selected_view_template}"/>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox
+            Grid.Row="3" Grid.Column="0"
+            Grid.ColumnSpan="2"
+            Margin="10,5,10,2"
+            Header="Тип планов:">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="25"/>
+                    <RowDefinition Height="25" />
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock
+                    Grid.Row="0" Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    Margin="5,5,5,2"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="Выберите тип планов:"/>
+
+                <RadioButton
+                    Grid.Row="1" Grid.Column="0"
+                    Margin="5,2,10,2"
+                    GroupName="nameSelection"
+                    Content="Надземная часть"
+                    FlowDirection="RightToLeft"
+                    IsChecked="{Binding are_above_ground_elements}"/>
+
+                <RadioButton
+                    Grid.Row="1" Grid.Column="1"
+                    Margin="10,2,5,2"
+                    GroupName="nameSelection"
+                    Content="Подземная часть"/>
+            </Grid>
+        </GroupBox>
+
+
+        <GroupBox
+            Grid.Row="4" Grid.Column="0"
+            Grid.ColumnSpan="2"
+            Margin="10,5,10,2"
+            Header="Префикс и суффикс маски наименования:">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="30"/>
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock
+                    Grid.Row="0" Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    Margin="5,2,5,0"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="Укажите префикс и суффикс маски наименования:"/>
+
+                <TextBlock
+                    Grid.Row="1" Grid.Column="0"
+                    Margin="5,0,5,0"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="Префикс:"/>
+
+                <TextBlock
+                    Grid.Row="1" Grid.Column="1"
+                    Margin="5,0,5,0"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="Суффикс:"/>
+
+                <TextBox
+                    Grid.Row="2" Grid.Column="0"
+                    Margin="5,0,5,2"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="{Binding name_prefix}"/>
+
+                <TextBox
+                    Grid.Row="2" Grid.Column="1"
+                    Margin="5,0,5,2"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center"
+                    Text="{Binding name_suffix}"/>
+            </Grid>
+        </GroupBox>
+
 
         <StackPanel
-            Grid.Row="3"
+            Grid.Row="6"
             Margin="10,5,10,10"
             Grid.ColumnSpan="2"
             Orientation="Horizontal"
@@ -93,7 +244,7 @@
                 Width="100"
                 Margin="10, 0"
                 Content="Создать"
-                Command="{Binding create_tables_command}"
+                Command="{Binding create_views_command}"
                 Click="ButtonOK_Click"/>
             <Button
                 Width="100"
