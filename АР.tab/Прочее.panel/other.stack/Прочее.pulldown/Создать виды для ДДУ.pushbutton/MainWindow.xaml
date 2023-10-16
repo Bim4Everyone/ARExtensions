@@ -7,8 +7,8 @@
              Title="Создание видов для ДДУ"
              mc:Ignorable="d"
              WindowStartupLocation="CenterScreen"
-             Height="700" Width="400"
-             MinHeight="700" MinWidth="400">
+             Height="730" Width="400"
+             MinHeight="730" MinWidth="400">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="80"/>
@@ -85,6 +85,14 @@
                     TextWrapping="Wrap"
                     VerticalAlignment="Center"
                     Text="Выберите области видимости:"/>
+
+                <Button
+                    Width="180"
+                    Height="25"
+                    HorizontalAlignment="Right"
+                    Margin="10, 0"
+                    Content="Выбрать все/Отменить выбор"
+                    Command="{Binding check_all_volumes_of_interest_command}"/>
 
                 <ListView
                     Margin="5,5,5,5"

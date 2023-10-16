@@ -24,10 +24,10 @@ clr.ImportExtensions(dosymep.Bim4Everyone)
 
 from dosymep_libs.bim4everyone import *
 
+
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 app = doc.Application
-
 
 class RevitRepository:
     """
@@ -191,7 +191,49 @@ class CreateViewsCommand(ICommand):
                         new_view.Name = self.__view_model.name_prefix \
                                         + level_number + "_" + volumes_of_interest.Name \
                                         + self.__view_model.name_suffix
+        return True
 
+
+class CheckAllVolumesOfInterestCommand(ICommand):
+    CanExecuteChanged, _canExecuteChanged = pyevent.make_event()
+
+    def __init__(self, view_model, *args):
+        ICommand.__init__(self, *args)
+        self.__view_model = view_model
+        self.__view_model.PropertyChanged += self.ViewModel_PropertyChanged
+
+    def add_CanExecuteChanged(self, value):
+        self.CanExecuteChanged += value
+
+    def remove_CanExecuteChanged(self, value):
+        self.CanExecuteChanged -= value
+
+    def OnCanExecuteChanged(self):
+        # В Python при работе с событиями нужно явно
+        # передавать импорт в обработчике события
+        from System import EventArgs
+        self._canExecuteChanged(self, EventArgs.Empty)
+
+    def ViewModel_PropertyChanged(self, sender, e):
+        self.OnCanExecuteChanged()
+
+    def CanExecute(self, parameter):
+        return True
+
+    def Execute(self, parameter):
+
+        temp = []
+        for volume_of_interest_item in self.__view_model.volume_of_interest_items:
+            if not self.__view_model.check_status:
+                volume_of_interest_item.is_checked = True
+            else:
+                volume_of_interest_item.is_checked = False
+            temp.append(volume_of_interest_item)
+
+        self.__view_model.check_status = not self.__view_model.check_status
+
+        self.__view_model.volume_of_interest_items = []
+        self.__view_model.volume_of_interest_items = temp
         return True
 
 
@@ -225,8 +267,10 @@ class MainWindowViewModel(Reactive):
         self.__name_prefix = "ШИФР_дом 1_"
         self.__name_suffix = ""
 
+        self.__check_status = False
         self.__error_text = ""
         self.__create_views_command = CreateViewsCommand(self)
+        self.__check_all_volumes_of_interest_command = CheckAllVolumesOfInterestCommand(self)
 
     @reactive
     def revit_repository(self):
@@ -251,6 +295,10 @@ class MainWindowViewModel(Reactive):
     @reactive
     def volume_of_interest_items(self):
         return self.__volume_of_interest_items
+
+    @volume_of_interest_items.setter
+    def volume_of_interest_items(self, value):
+        self.__volume_of_interest_items = value
 
     @reactive
     def are_above_ground_elements(self):
@@ -288,6 +336,13 @@ class MainWindowViewModel(Reactive):
     def name_suffix(self, value):
         self.__name_suffix = value
 
+    @reactive
+    def check_status(self):
+        return self.__check_status
+
+    @check_status.setter
+    def check_status(self, value):
+        self.__check_status = value
 
     @reactive
     def error_text(self):
@@ -300,6 +355,10 @@ class MainWindowViewModel(Reactive):
     @property
     def create_views_command(self):
         return self.__create_views_command
+
+    @property
+    def check_all_volumes_of_interest_command(self):
+        return self.__check_all_volumes_of_interest_command
 
 
 def convert_value(parameter):
