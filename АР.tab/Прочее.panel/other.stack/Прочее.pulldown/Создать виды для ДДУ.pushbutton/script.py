@@ -222,18 +222,21 @@ class CheckAllVolumesOfInterestCommand(ICommand):
 
     def Execute(self, parameter):
 
-        temp = []
+        #temp = []
         for volume_of_interest_item in self.__view_model.volume_of_interest_items:
             if not self.__view_model.check_status:
                 volume_of_interest_item.is_checked = True
+
             else:
                 volume_of_interest_item.is_checked = False
-            temp.append(volume_of_interest_item)
+            #temp.append(volume_of_interest_item)
 
+        self.__view_model.OnPropertyChanged("volume_of_interest_items")
+        self.__view_model.OnPropertyChanged("__volume_of_interest_items")
         self.__view_model.check_status = not self.__view_model.check_status
 
-        self.__view_model.volume_of_interest_items = []
-        self.__view_model.volume_of_interest_items = temp
+        #self.__view_model.volume_of_interest_items = []
+        #self.__view_model.volume_of_interest_items = temp
         return True
 
 

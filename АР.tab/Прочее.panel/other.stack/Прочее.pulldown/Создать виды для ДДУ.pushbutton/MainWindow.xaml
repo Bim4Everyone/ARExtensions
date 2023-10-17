@@ -97,19 +97,19 @@
                 <ListView
                     Margin="5,5,5,5"
                     Height="200"
-                    ItemsSource="{Binding volume_of_interest_items, UpdateSourceTrigger=PropertyChanged}">
+                    ItemsSource="{Binding volume_of_interest_items, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Width="30">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <CheckBox IsChecked="{Binding is_checked}"/>
+                                        <CheckBox IsChecked="{Binding is_checked, UpdateSourceTrigger=PropertyChanged}"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             <GridViewColumn
                                 Header="Области видимости" Width="290"
-                                DisplayMemberBinding="{Binding volumes_of_interest.Name}"/>
+                                DisplayMemberBinding="{Binding volumes_of_interest.Name, UpdateSourceTrigger=PropertyChanged}"/>
                         </GridView>
                     </ListView.View>
                 </ListView>
