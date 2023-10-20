@@ -78,12 +78,7 @@ class GeometryRoom:
         return self.room_obj.Number
 
     def get_group(self):
-        group_id = self.room_obj.GetParamValueOrDefault(self.group_param)
-        if group_id:
-            group = document.GetElement(group_id)
-            if group:
-                return RoomGroup(group.Name)
-        return RoomGroup("<Без группы>")
+        return RoomGroup(self.room_obj.GetParamValueStringOrDefault(self.group_param, "<Без группы>"))
 
     def get_range(self, direction):
         return self.x * direction.X - self.y * direction.Y
