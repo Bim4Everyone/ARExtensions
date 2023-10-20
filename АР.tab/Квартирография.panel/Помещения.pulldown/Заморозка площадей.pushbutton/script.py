@@ -45,6 +45,10 @@ def script_execute(plugin_logger):
     rooms.OfCategory(BuiltInCategory.OST_Rooms).ToElements()
 
     if rooms.FirstElement():
+        for param in area_params:
+            if not rooms.FirstElement().IsExistsParam(param):
+                ProjectParameters.Create(doc.Application).SetupRevitParam(doc, param)
+
         for param in area_fix_params:
             if not rooms.FirstElement().IsExistsParam(param):
                 ProjectParameters.Create(doc.Application).SetupRevitParam(doc, param)

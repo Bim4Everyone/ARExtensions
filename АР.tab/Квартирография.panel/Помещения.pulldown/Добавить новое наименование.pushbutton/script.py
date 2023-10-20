@@ -204,8 +204,7 @@ def find_schedule(document, name):
     fvp = ParameterValueProvider(ElementId(BuiltInParameter.VIEW_NAME))
     rule = FilterStringEquals()
     value = name
-    case_sens = False
-    filter_rule = FilterStringRule(fvp, rule, value, case_sens)
+    filter_rule = FilterStringRule(fvp, rule, value)
     name_filter = ElementParameterFilter(filter_rule)
 
     schedules.WherePasses(name_filter)
