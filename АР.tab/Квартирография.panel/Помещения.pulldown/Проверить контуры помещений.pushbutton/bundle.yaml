@@ -1,0 +1,12 @@
+title:
+  ru: Проверить контуры помещений
+  en_us: Check rooms boundaries
+
+tooltip:
+  ru: Проверяет контуры всех помещений в проекте на самопересечения
+  en_us: Checks rooms boundaries
+
+author: sssenya
+
+min_revit_version: 2020
+max_revit_version: 2024
