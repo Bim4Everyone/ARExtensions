@@ -1,0 +1,14 @@
+title:
+  ru: >-
+    Отделка пола
+  en_us: >-
+    Floor finishing
+
+tooltip:
+  ru: Создает перекрытия по выбранным помещениям.
+  en_us: Create floors by selected rooms.
+
+author: DiBrainz
+
+min_revit_version: 2020
+max_revit_version: 2022
