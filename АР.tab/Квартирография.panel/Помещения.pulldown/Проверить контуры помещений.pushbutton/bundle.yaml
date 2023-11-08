@@ -3,8 +3,22 @@ title:
   en_us: Check rooms boundaries
 
 tooltip:
-  ru: Проверяет контуры всех помещений в проекте на самопересечения
-  en_us: Checks rooms boundaries
+  ru: >-
+    Проверяет контуры помещений в проекте на самопересечения.
+    
+    
+    По умолчанию проверяет помещения в открытом проекте и во всех связях.
+    
+    Если перед запуском скрипта есть выделенные помещения, то проверяет только их.
+
+  en_us:  >-
+    Checks rooms boundaries.
+    
+    
+    Checks rooms in an active project and in all links.
+    
+    If some rooms are selected before start, checks these rooms. 
+  
 
 author: sssenya
 

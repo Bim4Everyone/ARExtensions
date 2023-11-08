@@ -6,7 +6,6 @@ clr.AddReference("dosymep.Bim4Everyone.dll")
 
 from pyrevit.forms import *
 from pyrevit import EXEC_PARAMS
-from pyrevit import script
 
 from Autodesk.Revit.DB.Architecture import Room
 from Autodesk.Revit.DB import *
@@ -16,6 +15,7 @@ import dosymep
 clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
 
+from dosymep.Revit import SpatialElementExtensions
 from dosymep_libs.bim4everyone import *
 
 doc = __revit__.ActiveUIDocument.Document
@@ -36,23 +36,7 @@ class RoomContour:
 
     @property
     def has_intersection(self):
-        return self.__find_intersection()
-
-    def __find_intersection(self):
-        intersection_result_aray = clr.Reference[IntersectionResultArray]()
-        length = len(self.__main_contour)
-        for i in range(length-2):
-            curve = self.__main_contour[i]
-            for j in range(i+2, length):
-                if i == 0 and j == length-1:
-                    continue
-
-                second_curve = self.__main_contour[j]
-                intersect = curve.Intersect(second_curve, intersection_result_aray)
-
-                if intersect == SetComparisonResult.Overlap:
-                    return True
-        return False
+        return SpatialElementExtensions.IsSelfCrossBoundaries(self.object)
 
     def __get_contours(self):
         opt = SpatialElementBoundaryOptions()
@@ -65,26 +49,20 @@ class RoomContour:
 
 
 def get_all_docs():
-    links_doc = [doc]
     links = FilteredElementCollector(doc).OfClass(RevitLinkInstance)
     not_nested_links = [x for x in links if not doc.GetElement(x.GetTypeId()).IsNestedLink]
-
-    for link in not_nested_links:
-        link_doc = link.GetLinkDocument()
-        if link_doc:
-            links_doc.append(link_doc)
+    links_doc = [x.GetLinkDocument() for x in not_nested_links if x.GetLinkDocument()]
+    links_doc.insert(0, doc)
 
     return links_doc
 
 
 def get_rooms():
-    selection = [doc.GetElement(x) for x in uidoc.Selection.GetElementIds()]
-    rooms = [x for x in selection if isinstance(x, Room)]
+    rooms = revit.get_selection().include(Room).elements
     if not rooms:
         docs = get_all_docs()
         for document in docs:
-            doc_rooms = FilteredElementCollector(document)
-            doc_rooms.OfCategory(BuiltInCategory.OST_Rooms).ToElements()
+            doc_rooms = FilteredElementCollector(document).OfCategory(BuiltInCategory.OST_Rooms)
             rooms += [x for x in doc_rooms if x.Area > 0]
     return rooms
 
@@ -97,13 +75,11 @@ def script_execute(plugin_logger):
 
     for room in contours:
         if room.has_intersection:
-            room_error = []
-            room_error.append(room.id)
-            room_error.append(room.name)
-            room_error.append(room.level)
-            room_error.append(room.phase)
-            room_error.append(room.document)
-            errors.append(room_error)
+            errors.append([room.id,
+                           room.name,
+                           room.level,
+                           room.phase,
+                           room.document])
 
     if errors:
         output = script.get_output()

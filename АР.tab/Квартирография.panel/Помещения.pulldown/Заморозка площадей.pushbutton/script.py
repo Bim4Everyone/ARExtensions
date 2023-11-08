@@ -41,17 +41,11 @@ def script_execute(plugin_logger):
                        SharedParamsConfig.Instance.RoomAreaWithRatioFix,
                        SharedParamsConfig.Instance.RoomAreaFix]
 
-    rooms = FilteredElementCollector(doc)
-    rooms.OfCategory(BuiltInCategory.OST_Rooms).ToElements()
+    rooms = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms).ToElements()
 
-    if rooms.FirstElement():
-        for param in area_params:
-            if not rooms.FirstElement().IsExistsParam(param):
-                ProjectParameters.Create(doc.Application).SetupRevitParam(doc, param)
-
-        for param in area_fix_params:
-            if not rooms.FirstElement().IsExistsParam(param):
-                ProjectParameters.Create(doc.Application).SetupRevitParam(doc, param)
+    if rooms:
+        ProjectParameters.Create(doc.Application).SetupRevitParams(doc, area_params)
+        ProjectParameters.Create(doc.Application).SetupRevitParams(doc, area_fix_params)
 
         with revit.Transaction("BIM: Заморозить площади помещений"):
             for room in rooms:
