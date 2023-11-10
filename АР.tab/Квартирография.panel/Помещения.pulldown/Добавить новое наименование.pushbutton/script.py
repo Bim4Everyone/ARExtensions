@@ -233,9 +233,7 @@ def script_execute(plugin_logger):
     while script_start:
         main_window = MainWindow()
         main_window.DataContext = MainWindowViewModel(name_schedule)
-        main_window.show_dialog()
-        script_start = main_window.DialogResult
-        if not script_start:
+        if not main_window.show_dialog():
             script.exit()
 
 
