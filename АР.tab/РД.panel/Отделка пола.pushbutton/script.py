@@ -1,6 +1,10 @@
 # coding=utf-8
 
 import clr
+import datetime
+
+from System.Collections.Generic import *
+from System.Windows.Input import ICommand
 
 clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
@@ -9,13 +13,16 @@ import dosymep.Revit
 
 clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
+from System.Windows.Input import ICommand
 
+import pyevent
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.DB.Architecture import RoomFilter
 from pyrevit import forms
+from pyrevit.forms import *
 from pyrevit import revit
 from pyrevit import script
-from pyrevit import EXEC_PARAMS
+from pyrevit import EXEC_PARAMS, revit
 from pyrevit.revit import HOST_APP
 
 from dosymep_libs.bim4everyone import *
@@ -24,10 +31,14 @@ doc = __revit__.ActiveUIDocument.Document
 
 
 def elements_to_list(elements):
-    res_list = []
-    for curve in elements:
-        res_list.append(curve)
-    return res_list
+    return [el for el in elements]
+
+
+def convert_value(value):
+    if HOST_APP.is_older_than(2022):
+        return UnitUtils.ConvertToInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
+    else:
+        return UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Millimeters)
 
 
 class RoomContour():
@@ -121,6 +132,21 @@ def collect_floor_types():
     return all_floor_types
 
 
+class CollectRevitInfo:
+    def __init__(self):
+        self.__floor_types = self.collect_floor_types()
+
+    @reactive
+    def floor_types(self):
+        return self.__floor_types
+
+    def collect_floor_types(self):
+        all_floor_types = FilteredElementCollector(doc) \
+            .WhereElementIsElementType() \
+            .OfCategory(BuiltInCategory.OST_Floors)
+        return all_floor_types
+
+
 def check_active_view_not_plan():
     active_view_type = doc.ActiveView.ViewType
     return active_view_type != ViewType.FloorPlan
@@ -133,10 +159,37 @@ def check_active_view_not_plan():
 #                   .FirstElementId())
 #     Floor.Create(doc, curve_loop, floor_type, level_id)
 
-def floor_create(room, floor_type):
+def floor_create(room, floor_type, level_offset=0):
+    '''
+    Создает перекрытие на основе CurveLoop помещения и его уровня, заданным типоразмером перекрытия со смещением
+    от уровня (опционально)
+    room: помещение, на основе которого будет создано перекрытие
+    floor_type: типоразмер перекрытия, который будет указан для создания
+    level_offset: смещение от уровня (по умолчанию 0)
+    '''
     curve_loop = RoomContour(room).get_curves_of_room()
     level_id = room.LevelId
-    Floor.Create(doc, curve_loop, floor_type.Id, level_id)
+    current_floor = Floor.Create(doc, curve_loop, floor_type.Id, level_id)
+    level_offset = convert_value(level_offset)
+    floor_offset = current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(level_offset)
+
+
+class MainWindow(WPFWindow):
+    def __init__(self):
+        self._context = None
+        self.xaml_source = op.join(op.dirname(__file__), "MainWindow.xaml")
+        super(MainWindow, self).__init__(self.xaml_source)
+
+
+class MainWindowViewModel(Reactive):
+    def __init__(self, revit_info):
+        Reactive.__init__(self)
+        self.__revit_info = revit_info
+        self.__floor_types = revit_info.floor_types
+
+    @reactive
+    def floor_types(self):
+        return self.__floor_types
 
 
 @notification()
@@ -156,7 +209,11 @@ def script_execute(plugin_logger):
 
     all_floors = collect_floor_types()
     floor_types = elements_to_list(all_floors)
-    with Transaction(doc, "Скрипт:Тест") as t:
+    main_window = MainWindow()
+    revit_info = CollectRevitInfo()
+    main_window.DataContext = MainWindowViewModel(revit_info)
+    main_window.show_dialog()
+    with Transaction(doc, "BIM: Отделка пола") as t:
         t.Start()
         for room in all_rooms:
             floor_type = floor_types[0]
