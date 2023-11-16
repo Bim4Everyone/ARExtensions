@@ -5,8 +5,10 @@ title:
     Floor finishing
 
 tooltip:
-  ru: Создает перекрытия по выбранным помещениям.
-  en_us: Create floors by selected rooms.
+  ru: На плане этажа создает перекрытия по выбранным помещениям.
+  en_us: On the floor plan, floors are created for the selected rooms.
+
+context: active-floor-plan
 
 author: DiBrainz
 

@@ -7,14 +7,90 @@
         Title="Отделка пола"
         mc:Ignorable="d"
         WindowStartupLocation="CenterScreen"
-        Height="400" Width="600"
-        MinHeight="400" MinWidth="400">
+        Height="300" Width="500"
+        ResizeMode="NoResize">
     <Grid>
-        <ComboBox
-            Margin="5,5,5,5"
-            Width="100"
-            Height="10"
-            DisplayMemberPath="Name"
-            ItemsSource="{Binding floor_types}"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="7*"></RowDefinition>
+            <RowDefinition Height="3*"></RowDefinition>
+        </Grid.RowDefinitions>
+        <GroupBox
+                Grid.Row ="0" Grid.Column="0"
+                Margin="20">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Row="0" Grid.Column="0"
+                    Margin="5"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Left"
+                    Text="Фильтр:"/>
+                <TextBlock
+                    Grid.Row="1" Grid.Column="0"
+                    Margin="5"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Left"
+                    Text="Тип перекрытия:"/>
+                <TextBlock
+                    Grid.Row="2" Grid.Column="0"
+                    Margin="5"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Left"
+                    Text="Смещение от уровня:"/>
+                <TextBox
+                    Grid.Row ="0" Grid.Column="1"
+                    TextAlignment="Right"
+                    VerticalContentAlignment="Center"
+                    Margin="10"/>
+                <ComboBox
+                    Grid.Row="1" Grid.Column="1"
+                    Margin="10"
+                    DisplayMemberPath="Name"
+                    VerticalContentAlignment="Center"
+                    ItemsSource="{Binding floor_types}"
+                    SelectedItem="{Binding selected_floor_type}"/>
+                <TextBox
+                    Grid.Row ="2" Grid.Column="1"
+                    TextAlignment="Right"
+                    VerticalContentAlignment="Center"
+                    Margin="10"
+                    Text="{Binding level_offset, FallbackValue=level_offset, UpdateSourceTrigger=PropertyChanged}"/>
+            </Grid>
+        </GroupBox>
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Top">
+                <RadioButton Content="По выбранным помещениям"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Left"
+                             IsChecked="{Binding is_checked_selected, FallbackValue=is_checked_selected, UpdateSourceTrigger=PropertyChanged}">
+                </RadioButton>
+                <RadioButton Content="По помещениям на виде"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Left">
+                </RadioButton>
+            </StackPanel>
+
+            <Button Grid.Row="1"
+                    Content="Создать"
+                    Width="100"
+                    VerticalAlignment="Center"
+                    Command="{Binding create_floors_by_rooms_on_view}"
+                    Click="ButtonOk_Click">
+            </Button>
+        </Grid>
+
     </Grid>
 </Window>
