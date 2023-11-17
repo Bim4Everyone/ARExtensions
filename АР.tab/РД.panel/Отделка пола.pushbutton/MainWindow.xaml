@@ -87,7 +87,7 @@
                     Content="Создать"
                     Width="100"
                     VerticalAlignment="Center"
-                    Command="{Binding create_floors_by_rooms_on_view}"
+                    Command="{Binding create_floors_by_rooms}"
                     Click="ButtonOk_Click">
             </Button>
         </Grid>

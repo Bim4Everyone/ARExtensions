@@ -1,8 +1,6 @@
 # coding=utf-8
 
 import clr
-import datetime
-import re
 from System.Collections.Generic import *
 
 clr.AddReference("dosymep.Revit.dll")
@@ -13,20 +11,24 @@ import dosymep.Revit
 clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
 from System.Windows.Input import ICommand
+from Autodesk.Revit.UI.Selection import ISelectionFilter
 
 import pyevent
 from Autodesk.Revit.DB import *
-from Autodesk.Revit.DB.Architecture import RoomFilter
+from Autodesk.Revit.DB.Architecture import RoomFilter, Room
 from pyrevit import forms
 from pyrevit.forms import *
 from pyrevit import revit
 from pyrevit import script
 from pyrevit import EXEC_PARAMS, revit
 from pyrevit.revit import HOST_APP
-
+from Autodesk.Revit.UI.Selection import ObjectType
 from dosymep_libs.bim4everyone import *
+import Autodesk.Revit.Exceptions as Exceptions
 
 doc = __revit__.ActiveUIDocument.Document
+uidoc = __revit__.ActiveUIDocument
+active_view = doc.ActiveView
 
 
 def elements_to_list(elements):
@@ -40,15 +42,27 @@ def convert_value(value):
         return UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Millimeters)
 
 
-# def check_active_view_not_plan():
-#     active_view_type = doc.ActiveView.ViewType
-#     return active_view_type != ViewType.FloorPlan
+class ClassISelectionFilter(ISelectionFilter):
+    def __init__(self, element_class):
+        self.element_class = element_class
+
+    def AllowElement(self, elem):
+        if isinstance(elem, self.element_class) and elem.Area > 0:
+            return True
+        else:
+            return False
+
+    def AllowReference(self, ref, point):
+        return True
 
 
 class RevitRepository:
     def __init__(self, doc):
         self.doc = doc
         self.__floor_types = self.__collect_floor_types()
+        self.__all_rooms = self.__collect_all_rooms()
+        self.__rooms_on_active_view = self.__collect_rooms_on_active_view()
+        self.__room_parameters = self.__get_room_parameters()
 
     @reactive
     def floor_types(self):
@@ -60,15 +74,71 @@ class RevitRepository:
             .OfCategory(BuiltInCategory.OST_Floors)
         return elements_to_list(all_floor_types)
 
+    @reactive
+    def rooms_on_active_view(self):
+        return self.__rooms_on_active_view
+
+    def __collect_rooms_on_active_view(self):
+        '''
+        Функция возвращает размещенные помещения на активном виде, у которых значение параметра "Площадь" больше 0
+        '''
+        room_filter = RoomFilter()
+        all_rooms = FilteredElementCollector(doc, active_view.Id) \
+            .WherePasses(room_filter) \
+            .ToElements()
+        correct_rooms = [room for room in all_rooms if room.Area > 0]
+        return correct_rooms
+
+    @reactive
+    def all_rooms(self):
+        return self.__all_rooms
+
+    def __collect_all_rooms(self):
+        '''
+        Функция возвращает размещенные помещения, у которых значение параметра "Площадь" больше 0
+        '''
+        room_filter = RoomFilter()
+        all_rooms = FilteredElementCollector(doc) \
+            .WherePasses(room_filter) \
+            .ToElements()
+        correct_rooms = [room for room in all_rooms if
+                         room.Location is not None and room.Area > 0]
+        return correct_rooms
+
+    def select_rooms_on_view(self):
+        '''
+        Функция реализует выбор элементов при помощи интерфейса ISelectionFilter и возвращает список выбранных
+        пользователем помещений
+        '''
+        elements = []
+        ref_list = uidoc.Selection.PickObjects(ObjectType.Element, ClassISelectionFilter(Room), "Выберите помещения")
+        for el in ref_list:
+            elements.append(doc.GetElement(el))
+        return elements
+
+    @reactive
+    def room_parameters(self):
+        return self.__room_parameters
+
+    def __get_room_parameters(self):
+        room_filter = RoomFilter()
+        room = FilteredElementCollector(doc) \
+            .WherePasses(room_filter) \
+            .FirstElement()
+        if isinstance(room, Room):
+            parameters_list = [p.Definition.Name for p in room.Parameters]
+            return parameters_list
+        return
+
 
 class RoomContour:
     def __init__(self, room):
         self.room = room
 
     def get_curves_of_room(self):
-        spatialElementBoundaryOptions = SpatialElementBoundaryOptions()
+        spatial_element_boundary_options = SpatialElementBoundaryOptions()
         curves = []
-        loops = self.room.GetBoundarySegments(spatialElementBoundaryOptions)
+        loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
         for loop in loops:
             if HOST_APP.is_newer_than(2021):
                 curve = CurveLoop()
@@ -131,32 +201,20 @@ class RoomContour:
 
         return simplified_curves
 
+    def get_doors_in_rooms(self):
+        room = self.room
+        geo = room.get_Geometry(Options())
+        for g in geo:
+            if isinstance(g, Solid):
+                virtual_solid = g
+        intersect_filter = ElementIntersectsSolidFilter(virtual_solid)
+        doors = (FilteredElementCollector(doc, active_view.Id)
+                 .WhereElementIsNotElementType().OfCategory(BuiltInCategory.OST_Doors)
+                 .WherePasses(intersect_filter))
+        return elements_to_list(doors)
 
-def collect_rooms():
-    '''
-    Функция возвращает размещенные помещения, у которых значение параметра "Площадь" не равно 0
-    '''
-    room_filter = RoomFilter()
-    all_rooms = FilteredElementCollector(doc) \
-        .WherePasses(room_filter) \
-        .ToElements()
-    correct_rooms = [room for room in all_rooms if
-                     room.Location is not None and room.get_Parameter(BuiltInParameter.ROOM_AREA).AsDouble != 0]
-    return correct_rooms
 
-
-# def floor_create(curve_loop, level_id):
-#     floor_type = (FilteredElementCollector(doc)
-#                   .WhereElementIsElementType()
-#                   .OfCategory(BuiltInCategory.OST_Floors)
-#                   .FirstElementId())
-#     Floor.Create(doc, curve_loop, floor_type, level_id)
 class CreateFloorsByRooms:
-    def __init__(self):
-        self.__rooms = collect_rooms()
-
-    def rooms(self):
-        return self.__rooms
 
     def floor_create(self, room, floor_type, level_offset=0):
         '''
@@ -167,27 +225,31 @@ class CreateFloorsByRooms:
         level_offset: смещение от уровня (по умолчанию 0)
         '''
         curve_loop = RoomContour(room).get_curves_of_room()
+        doors = RoomContour(room).get_doors_in_rooms()
+        if len(doors) > 0:
+            print(room.get_Parameter(BuiltInParameter.ROOM_NAME).AsString())
+            for d in doors:
+                print(d.Id)
         level_id = room.LevelId
         current_floor = Floor.Create(doc, curve_loop, floor_type.Id, level_id)
         converted_level_offset = convert_value(level_offset)
         floor_offset = current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(
             converted_level_offset)
 
-    def create_floors_by_rooms_on_view(self, floor_type, level_offset=0):
+    def create_floors_by_rooms_on_view(self, rooms, floor_type, level_offset=0):
         '''
         Создает перекрытия последовательно по помещениям в выборке, используя функцию создания перекрытия по помещению
         floor_type: типоразмер перекрытия, который будет указан для создания
         level_offset: смещение от уровня (по умолчанию 0)
         '''
-        all_rooms = self.rooms()
         with Transaction(doc, "BIM: Создание перекрытий") as t:
             t.Start()
-            for room in all_rooms:
+            for room in rooms:
                 self.floor_create(room, floor_type, level_offset)
             t.Commit()
 
 
-class CreateFloorsByRoomsOnViewCommand(ICommand):
+class CreateFloorsByRoomsCommand(ICommand):
     CanExecuteChanged, _canExecuteChanged = pyevent.make_event()
 
     def __init__(self, view_model, *args):
@@ -216,7 +278,13 @@ class CreateFloorsByRoomsOnViewCommand(ICommand):
 
     def Execute(self, parameter):
         if not self.__view_model.is_checked_selected:
-            self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.selected_floor_type,
+            self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.rooms_on_active_view,
+                                                                        self.__view_model.selected_floor_type,
+                                                                        self.__view_model.level_offset)
+        else:
+            select_rooms = RevitRepository(doc).select_rooms_on_view()
+            self.__create_floors_by_view.create_floors_by_rooms_on_view(select_rooms,
+                                                                        self.__view_model.selected_floor_type,
                                                                         self.__view_model.level_offset)
 
 
@@ -235,25 +303,31 @@ class MainWindowViewModel(Reactive):
         Reactive.__init__(self)
         self.__revit_info = revit_info
         self.__floor_types = revit_info.floor_types
+        self.__rooms_on_active_view = revit_info.rooms_on_active_view
 
         if len(self.__floor_types) > 0:
             self.__selected_floor_type = self.floor_types[0]
 
         self.__level_offset = 0
-        self.__create_floors_by_rooms_on_view = CreateFloorsByRoomsOnViewCommand(self)
         self.__is_checked_selected = True
+        self.__create_floors_by_rooms = CreateFloorsByRoomsCommand(self)
+        self.__room_parameters = revit_info.room_parameters
 
     @reactive
     def floor_types(self):
         return self.__floor_types
 
     @reactive
+    def rooms_on_active_view(self):
+        return self.__rooms_on_active_view
+
+    @reactive
     def selected_floor_type(self):
         return self.__selected_floor_type
 
     @property
-    def create_floors_by_rooms_on_view(self):
-        return self.__create_floors_by_rooms_on_view
+    def create_floors_by_rooms(self):
+        return self.__create_floors_by_rooms
 
     @reactive
     def selected_floor_type(self):
@@ -279,40 +353,28 @@ class MainWindowViewModel(Reactive):
     def is_checked_selected(self, value):
         self.__is_checked_selected = value
 
+    @reactive
+    def room_parameters(self):
+        return self.__room_parameters
+
 
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
-    all_rooms = collect_rooms()
+    revit_info = RevitRepository(doc)
+
+    all_rooms = revit_info.all_rooms
 
     # Проверка на неразмещенные помещения с площадью == 0
     if len(all_rooms) == 0:
         forms.alert("В проекте отсутствуют размещенные помещения")
         return
 
-    # # Проверка принадлежности активного вида не к Плану этажа
-    # if check_active_view_not_plan():
-    #     forms.alert("Для запуска плагина перейдите на план этажа!")
-    #     return
-
-    # all_floors = collect_floor_types()
-    # floor_types = elements_to_list(all_floors)
-    revit_info = RevitRepository(doc)
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_info)
     main_window.show_dialog()
     if not main_window.DialogResult:
         script.exit()
-    # with Transaction(doc, "BIM: Отделка пола") as t:
-    #     t.Start()
-    #     for room in all_rooms:
-    #         floor_type = floor_types[0]
-    #         # curve = RoomContour(room).get_curves_of_room()
-    #         # level_id = room.LevelId
-    #         # floor_create(curve, level_id)
-    #         floor_create(room, floor_type)
-    #
-    #     t.Commit()
 
 
 script_execute()
