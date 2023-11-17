@@ -149,18 +149,31 @@ class RoomContour:
         spatial_element_boundary_options = SpatialElementBoundaryOptions()
         curves = []
         loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
-        for loop in loops:
-            if HOST_APP.is_newer_than(2021):
+        # for loop in loops:
+        #     if HOST_APP.is_newer_than(2021):
+        #         curve = CurveLoop()
+        #         for i in range(len(loop)):
+        #             curve.Append(loop[i].GetCurve())
+        #         curves.append(self.simplify(curve))
+        #     else:
+        #         curve = CurveArray()
+        #         for i in range(len(loop)):
+        #             curve.Append(loop[i].GetCurve())
+        #         curves.append(curve)
+        if HOST_APP.is_newer_than(2021):
+            for loop in loops:
                 curve = CurveLoop()
                 for i in range(len(loop)):
                     curve.Append(loop[i].GetCurve())
                 curves.append(self.simplify(curve))
-            else:
-                curve = CurveArray()
+            return curves
+        else:
+            curve = CurveArray()
+            for loop in loops:
                 for i in range(len(loop)):
                     curve.Append(loop[i].GetCurve())
-                curves.append(curve)
-        return curves
+            return curve
+        # return curves
 
     def append_curve(self, curve, next_curve):
         '''
@@ -235,11 +248,17 @@ class CreateFloorsByRooms:
         floor_type: типоразмер перекрытия, который будет указан для создания
         level_offset: смещение от уровня (по умолчанию 0)
         '''
-        curve_loop = RoomContour(room).get_curves_of_room()
-        level_id = room.LevelId
-        current_floor = Floor.Create(doc, curve_loop, floor_type.Id, level_id)
-        converted_level_offset = convert_value(level_offset)
-        current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(converted_level_offset)
+        curve = RoomContour(room).get_curves_of_room()
+        if HOST_APP.is_older_than(2022):
+            level = doc.GetElement(room.LevelId)
+            current_floor = doc.Create.NewFloor(curve, floor_type, level, False)
+            converted_level_offset = convert_value(level_offset)
+            current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(converted_level_offset)
+        else:
+            level_id = room.LevelId
+            current_floor = Floor.Create(doc, curve, floor_type.Id, level_id)
+            converted_level_offset = convert_value(level_offset)
+            current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(converted_level_offset)
 
     def create_floors_by_rooms_on_view(self, rooms, floor_type, level_offset=0):
         '''
