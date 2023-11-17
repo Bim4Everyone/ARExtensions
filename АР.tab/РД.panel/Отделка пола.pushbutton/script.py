@@ -63,6 +63,7 @@ class RevitRepository:
         self.__all_rooms = self.__collect_all_rooms()
         self.__rooms_on_active_view = self.__collect_rooms_on_active_view()
         self.__room_parameters = self.__get_room_parameters()
+        self.__selected_rooms = self.__get_selected_rooms()
 
     @reactive
     def floor_types(self):
@@ -129,6 +130,15 @@ class RevitRepository:
             parameters_list = [p.Definition.Name for p in room.Parameters]
             return parameters_list
         return
+
+    @reactive
+    def selected_rooms(self):
+        return self.__selected_rooms
+
+    def __get_selected_rooms(self):
+        selected_element_ids = uidoc.Selection.GetElementIds()
+        elements = [doc.GetElement(el) for el in selected_element_ids if isinstance(doc.GetElement(el), Room)]
+        return elements
 
 
 class RoomContour:
@@ -226,11 +236,6 @@ class CreateFloorsByRooms:
         level_offset: смещение от уровня (по умолчанию 0)
         '''
         curve_loop = RoomContour(room).get_curves_of_room()
-        doors = RoomContour(room).get_doors_in_rooms()
-        if len(doors) > 0:
-            print(room.get_Parameter(BuiltInParameter.ROOM_NAME).AsString())
-            for d in doors:
-                print(d.Id)
         level_id = room.LevelId
         current_floor = Floor.Create(doc, curve_loop, floor_type.Id, level_id)
         converted_level_offset = convert_value(level_offset)
@@ -277,13 +282,17 @@ class CreateFloorsByRoomsCommand(ICommand):
         return True
 
     def Execute(self, parameter):
-        if not self.__view_model.is_checked_selected:
-            self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.rooms_on_active_view,
+        if self.__view_model.is_checked_selected:
+            self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.selected_rooms,
                                                                         self.__view_model.selected_floor_type,
                                                                         self.__view_model.level_offset)
-        else:
+        elif self.__view_model.is_checked_select:
             select_rooms = RevitRepository(doc).select_rooms_on_view()
             self.__create_floors_by_view.create_floors_by_rooms_on_view(select_rooms,
+                                                                        self.__view_model.selected_floor_type,
+                                                                        self.__view_model.level_offset)
+        elif self.__view_model.is_checked_on_view:
+            self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.rooms_on_active_view,
                                                                         self.__view_model.selected_floor_type,
                                                                         self.__view_model.level_offset)
 
@@ -309,7 +318,19 @@ class MainWindowViewModel(Reactive):
             self.__selected_floor_type = self.floor_types[0]
 
         self.__level_offset = 0
-        self.__is_checked_selected = True
+        self.__selected_rooms = revit_info.selected_rooms
+        self.__is_checked_select = True
+        self.__is_checked_on_view = False
+        self.__is_checked_selected = False
+        if len(self.__selected_rooms):
+            self.__is_checked_on_view_visibility = "Visible"
+            self.__is_checked_selected_content = ("По предварительно выбранным помещениям ({})"
+                                                  .format(len(self.__selected_rooms)))
+            self.__is_checked_selected = True
+            self.__is_checked_select = False
+        else:
+            self.__is_checked_on_view_visibility = "Hidden"
+
         self.__create_floors_by_rooms = CreateFloorsByRoomsCommand(self)
         self.__room_parameters = revit_info.room_parameters
 
@@ -354,8 +375,36 @@ class MainWindowViewModel(Reactive):
         self.__is_checked_selected = value
 
     @reactive
+    def is_checked_selected_content(self):
+        return self.__is_checked_selected_content
+
+    @reactive
+    def is_checked_select(self):
+        return self.__is_checked_select
+
+    @is_checked_select.setter
+    def is_checked_select(self, value):
+        self.__is_checked_select = value
+
+    @reactive
+    def is_checked_on_view(self):
+        return self.__is_checked_on_view
+
+    @is_checked_on_view.setter
+    def is_checked_on_view(self, value):
+        self.__is_checked_on_view = value
+
+    @reactive
+    def is_checked_on_view_visibility(self):
+        return self.__is_checked_on_view_visibility
+
+    @reactive
     def room_parameters(self):
         return self.__room_parameters
+
+    @reactive
+    def selected_rooms(self):
+        return self.__selected_rooms
 
 
 @notification()
@@ -364,7 +413,7 @@ def script_execute(plugin_logger):
     revit_info = RevitRepository(doc)
 
     all_rooms = revit_info.all_rooms
-    
+
     # Проверка на неразмещенные помещения с площадью == 0
     if len(all_rooms) == 0:
         forms.alert("В проекте отсутствуют размещенные помещения")

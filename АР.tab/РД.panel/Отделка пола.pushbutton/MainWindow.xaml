@@ -7,12 +7,12 @@
         Title="Отделка пола"
         mc:Ignorable="d"
         WindowStartupLocation="CenterScreen"
-        Height="300" Width="500"
+        Height="250" Width="500"
         ResizeMode="NoResize">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="7*"></RowDefinition>
-            <RowDefinition Height="3*"></RowDefinition>
+            <RowDefinition Height="6*"></RowDefinition>
+            <RowDefinition Height="4*"></RowDefinition>
         </Grid.RowDefinitions>
         <GroupBox
                 Grid.Row ="0" Grid.Column="0"
@@ -20,7 +20,6 @@
 
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
                 </Grid.RowDefinitions>
@@ -33,12 +32,6 @@
                     Margin="5"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Left"
-                    Text="Фильтр помещений:"/>
-                <TextBlock
-                    Grid.Row="1" Grid.Column="0"
-                    Margin="5"
-                    VerticalAlignment="Center"
-                    HorizontalAlignment="Left"
                     Text="Тип перекрытия:"/>
                 <TextBlock
                     Grid.Row="2" Grid.Column="0"
@@ -46,13 +39,8 @@
                     VerticalAlignment="Center"
                     HorizontalAlignment="Left"
                     Text="Смещение от уровня, мм:"/>
-                <TextBox
-                    Grid.Row ="0" Grid.Column="1"
-                    TextAlignment="Right"
-                    VerticalContentAlignment="Center"
-                    Margin="10"/>
                 <ComboBox
-                    Grid.Row="1" Grid.Column="1"
+                    Grid.Row="0" Grid.Column="1"
                     Margin="10"
                     DisplayMemberPath="Name"
                     VerticalContentAlignment="Center"
@@ -71,15 +59,22 @@
                 <RowDefinition/>
                 <RowDefinition/>
             </Grid.RowDefinitions>
-            <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Top">
+            <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <RadioButton Content="{Binding is_checked_selected_content, FallbackValue=is_checked_selected_content, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Left"
+                             Visibility="{Binding is_checked_on_view_visibility, FallbackValue=is_checked_on_view_visibility, UpdateSourceTrigger=PropertyChanged}"
+                             IsChecked="{Binding is_checked_selected, FallbackValue=is_checked_selected, UpdateSourceTrigger=PropertyChanged}">
+                </RadioButton>
                 <RadioButton Content="По выбранным помещениям"
                              VerticalAlignment="Center"
                              HorizontalAlignment="Left"
-                             IsChecked="{Binding is_checked_selected, FallbackValue=is_checked_selected, UpdateSourceTrigger=PropertyChanged}">
+                             IsChecked="{Binding is_checked_select, FallbackValue=is_checked_select, UpdateSourceTrigger=PropertyChanged}">
                 </RadioButton>
                 <RadioButton Content="По помещениям на виде"
                              VerticalAlignment="Center"
-                             HorizontalAlignment="Left">
+                             HorizontalAlignment="Left"
+                             IsChecked="{Binding is_checked_on_view, FallbackValue=is_checked_on_view, UpdateSourceTrigger=PropertyChanged}">
                 </RadioButton>
             </StackPanel>
 
