@@ -33,7 +33,7 @@
                     Margin="5"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Left"
-                    Text="Фильтр:"/>
+                    Text="Фильтр помещений:"/>
                 <TextBlock
                     Grid.Row="1" Grid.Column="0"
                     Margin="5"
@@ -45,7 +45,7 @@
                     Margin="5"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Left"
-                    Text="Смещение от уровня:"/>
+                    Text="Смещение от уровня, мм:"/>
                 <TextBox
                     Grid.Row ="0" Grid.Column="1"
                     TextAlignment="Right"
@@ -91,6 +91,5 @@
                     Click="ButtonOk_Click">
             </Button>
         </Grid>
-
     </Grid>
 </Window>

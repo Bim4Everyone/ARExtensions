@@ -209,7 +209,8 @@ class RoomContour:
                 virtual_solid = g
         intersect_filter = ElementIntersectsSolidFilter(virtual_solid)
         doors = (FilteredElementCollector(doc, active_view.Id)
-                 .WhereElementIsNotElementType().OfCategory(BuiltInCategory.OST_Doors)
+                 .WhereElementIsNotElementType()
+                 .OfCategory(BuiltInCategory.OST_Doors)
                  .WherePasses(intersect_filter))
         return elements_to_list(doors)
 
@@ -233,8 +234,7 @@ class CreateFloorsByRooms:
         level_id = room.LevelId
         current_floor = Floor.Create(doc, curve_loop, floor_type.Id, level_id)
         converted_level_offset = convert_value(level_offset)
-        floor_offset = current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(
-            converted_level_offset)
+        current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(converted_level_offset)
 
     def create_floors_by_rooms_on_view(self, rooms, floor_type, level_offset=0):
         '''
@@ -364,7 +364,7 @@ def script_execute(plugin_logger):
     revit_info = RevitRepository(doc)
 
     all_rooms = revit_info.all_rooms
-
+    
     # Проверка на неразмещенные помещения с площадью == 0
     if len(all_rooms) == 0:
         forms.alert("В проекте отсутствуют размещенные помещения")
