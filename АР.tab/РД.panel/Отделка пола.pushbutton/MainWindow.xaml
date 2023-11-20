@@ -60,31 +60,46 @@
                 <RowDefinition/>
             </Grid.RowDefinitions>
             <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <RadioButton Content="{Binding is_checked_selected_content, FallbackValue=is_checked_selected_content, UpdateSourceTrigger=PropertyChanged}"
+                <RadioButton Content="{Binding is_checked_selected_content, FallbackValue=is_checked_selected_content}"
                              VerticalAlignment="Center"
                              HorizontalAlignment="Left"
-                             Visibility="{Binding is_checked_on_view_visibility, FallbackValue=is_checked_on_view_visibility, UpdateSourceTrigger=PropertyChanged}"
-                             IsChecked="{Binding is_checked_selected, FallbackValue=is_checked_selected, UpdateSourceTrigger=PropertyChanged}">
+                             Visibility="{Binding is_checked_on_view_visibility, FallbackValue=is_checked_on_view_visibility}"
+                             IsChecked="{Binding is_checked_selected, FallbackValue=is_checked_selected}">
                 </RadioButton>
                 <RadioButton Content="По выбранным помещениям"
                              VerticalAlignment="Center"
                              HorizontalAlignment="Left"
-                             IsChecked="{Binding is_checked_select, FallbackValue=is_checked_select, UpdateSourceTrigger=PropertyChanged}">
+                             IsChecked="{Binding is_checked_select, FallbackValue=is_checked_select}">
                 </RadioButton>
                 <RadioButton Content="По помещениям на виде"
                              VerticalAlignment="Center"
                              HorizontalAlignment="Left"
-                             IsChecked="{Binding is_checked_on_view, FallbackValue=is_checked_on_view, UpdateSourceTrigger=PropertyChanged}">
+                             IsChecked="{Binding is_checked_on_view, FallbackValue=is_checked_on_view}">
                 </RadioButton>
             </StackPanel>
-
-            <Button Grid.Row="1"
-                    Content="Создать"
-                    Width="100"
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.5*"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1.5*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                    Text="{Binding error_text, FallbackValue=ErrorText}"
+                    Margin="5 0"
                     VerticalAlignment="Center"
-                    Command="{Binding create_floors_by_rooms}"
-                    Click="ButtonOk_Click">
-            </Button>
+                    HorizontalAlignment="Right"
+                    Foreground="Orange"/>
+                <Button Grid.Column="1"
+                        Content="Создать"
+                        Width="100"
+                        Height="25"
+                        VerticalAlignment="Center"
+                        Command="{Binding create_floors_by_rooms}"
+                        Click="ButtonOk_Click">
+                </Button>
+
+            </Grid>
+
         </Grid>
     </Grid>
 </Window>

@@ -1,30 +1,31 @@
 # coding=utf-8
 
 import clr
-from System.Collections.Generic import *
 
 clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
 
-import dosymep.Revit
+import pyevent
+
+from System.Windows.Input import ICommand
+
+from Autodesk.Revit.UI.Selection import ISelectionFilter
+from Autodesk.Revit.DB.Architecture import RoomFilter, Room
+from Autodesk.Revit.UI.Selection import ObjectType
+
+import dosymep
 
 clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
-from System.Windows.Input import ICommand
-from Autodesk.Revit.UI.Selection import ISelectionFilter
 
-import pyevent
-from Autodesk.Revit.DB import *
-from Autodesk.Revit.DB.Architecture import RoomFilter, Room
 from pyrevit import forms
 from pyrevit.forms import *
 from pyrevit import revit
 from pyrevit import script
-from pyrevit import EXEC_PARAMS, revit
+from pyrevit import EXEC_PARAMS
 from pyrevit.revit import HOST_APP
-from Autodesk.Revit.UI.Selection import ObjectType
+
 from dosymep_libs.bim4everyone import *
-import Autodesk.Revit.Exceptions as Exceptions
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -37,9 +38,17 @@ def elements_to_list(elements):
 
 def convert_value(value):
     if HOST_APP.is_older_than(2022):
-        return UnitUtils.ConvertToInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
+        return UnitUtils.ConvertToInternalUnits(int(value), DisplayUnitType.DUT_MILLIMETERS)
     else:
-        return UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Millimeters)
+        return UnitUtils.ConvertToInternalUnits(int(value), UnitTypeId.Millimeters)
+
+
+def is_int(value):
+    try:
+        int(value)
+        return True
+    except:
+        return False
 
 
 class ClassISelectionFilter(ISelectionFilter):
@@ -149,17 +158,6 @@ class RoomContour:
         spatial_element_boundary_options = SpatialElementBoundaryOptions()
         curves = []
         loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
-        # for loop in loops:
-        #     if HOST_APP.is_newer_than(2021):
-        #         curve = CurveLoop()
-        #         for i in range(len(loop)):
-        #             curve.Append(loop[i].GetCurve())
-        #         curves.append(self.simplify(curve))
-        #     else:
-        #         curve = CurveArray()
-        #         for i in range(len(loop)):
-        #             curve.Append(loop[i].GetCurve())
-        #         curves.append(curve)
         if HOST_APP.is_newer_than(2021):
             for loop in loops:
                 curve = CurveLoop()
@@ -173,7 +171,6 @@ class RoomContour:
                 for i in range(len(loop)):
                     curve.Append(loop[i].GetCurve())
             return curve
-        # return curves
 
     def append_curve(self, curve, next_curve):
         '''
@@ -298,6 +295,11 @@ class CreateFloorsByRoomsCommand(ICommand):
         self.OnCanExecuteChanged()
 
     def CanExecute(self, parameter):
+        if not is_int(self.__view_model.level_offset):
+            self.__view_model.error_text = "Введите целое число"
+            return False
+
+        self.__view_model.error_text = None
         return True
 
     def Execute(self, parameter):
@@ -336,7 +338,7 @@ class MainWindowViewModel(Reactive):
         if len(self.__floor_types) > 0:
             self.__selected_floor_type = self.floor_types[0]
 
-        self.__level_offset = 0
+        self.__level_offset = "0"
         self.__selected_rooms = revit_info.selected_rooms
         self.__is_checked_select = True
         self.__is_checked_on_view = False
@@ -350,8 +352,9 @@ class MainWindowViewModel(Reactive):
         else:
             self.__is_checked_on_view_visibility = "Hidden"
 
-        self.__create_floors_by_rooms = CreateFloorsByRoomsCommand(self)
         self.__room_parameters = revit_info.room_parameters
+        self.__error_text = ""
+        self.__create_floors_by_rooms = CreateFloorsByRoomsCommand(self)
 
     @reactive
     def floor_types(self):
@@ -424,6 +427,14 @@ class MainWindowViewModel(Reactive):
     @reactive
     def selected_rooms(self):
         return self.__selected_rooms
+
+    @reactive
+    def error_text(self):
+        return self.__error_text
+
+    @error_text.setter
+    def error_text(self, value):
+        self.__error_text = value
 
 
 @notification()
