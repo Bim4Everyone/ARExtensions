@@ -154,7 +154,10 @@ class RoomContour:
     def __init__(self, room):
         self.room = room
 
-    def get_curves_of_room(self):
+    def get_curve_loops_of_room(self):
+        '''
+        Возвращает список замкнутых петель из границ помещения (для Revit 2022 и новее)
+        '''
         spatial_element_boundary_options = SpatialElementBoundaryOptions()
         curves = []
         loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
@@ -165,12 +168,31 @@ class RoomContour:
                     curve.Append(loop[i].GetCurve())
                 curves.append(self.simplify(curve))
             return curves
-        else:
-            curve = CurveArray()
+
+    def get_curve_arrays_of_room(self):
+        '''
+        Возвращает самый длинный массив кривых (ограничивающий контур) из границ помещения, а также список массивов
+        кривых, если они есть внутри помещения (для Revit 2021 и старше)
+        '''
+        spatial_element_boundary_options = SpatialElementBoundaryOptions()
+        loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
+        if HOST_APP.is_older_than(2022):
+            res_curve_array = None
+            prev_max_length = 0
+            curves_for_openings = []
             for loop in loops:
+                curve = CurveArray()
+                current_length = 0
                 for i in range(len(loop)):
                     curve.Append(loop[i].GetCurve())
-            return curve
+                for c in curve:
+                    current_length += c.Length
+                if current_length > prev_max_length:
+                    prev_max_length = current_length
+                    res_curve_array = curve
+                else:
+                    curves_for_openings.append(curve)
+            return res_curve_array, curves_for_openings
 
     def append_curve(self, curve, next_curve):
         '''
@@ -245,29 +267,54 @@ class CreateFloorsByRooms:
         floor_type: типоразмер перекрытия, который будет указан для создания
         level_offset: смещение от уровня (по умолчанию 0)
         '''
-        curve = RoomContour(room).get_curves_of_room()
         if HOST_APP.is_older_than(2022):
+            curve_array = RoomContour(room).get_curve_arrays_of_room()[0]
             level = doc.GetElement(room.LevelId)
-            current_floor = doc.Create.NewFloor(curve, floor_type, level, False)
+            current_floor = doc.Create.NewFloor(curve_array, floor_type, level, False)
             converted_level_offset = convert_value(level_offset)
             current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(converted_level_offset)
+            return current_floor
         else:
+            curve_loops = RoomContour(room).get_curve_loops_of_room()
             level_id = room.LevelId
-            current_floor = Floor.Create(doc, curve, floor_type.Id, level_id)
+            current_floor = Floor.Create(doc, curve_loops, floor_type.Id, level_id)
             converted_level_offset = convert_value(level_offset)
             current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(converted_level_offset)
+            return current_floor
+
+    def openings_create(self, floor, curves):
+        if len(curves) != 0:
+            for curve in curves:
+                doc.Create.NewOpening(floor, curve, True)
 
     def create_floors_by_rooms_on_view(self, rooms, floor_type, level_offset=0):
         '''
         Создает перекрытия последовательно по помещениям в выборке, используя функцию создания перекрытия по помещению
+        Для Revit версии 2021 и старше создаются вырезания в перекрытии отдельной транзакцией, если контур помещения
+        состоит из нескольких окружающих кривых
         floor_type: типоразмер перекрытия, который будет указан для создания
         level_offset: смещение от уровня (по умолчанию 0)
         '''
-        with Transaction(doc, "BIM: Создание перекрытий") as t:
-            t.Start()
-            for room in rooms:
-                self.floor_create(room, floor_type, level_offset)
-            t.Commit()
+        if HOST_APP.is_older_than(2022):
+            with Transaction(doc, "BIM: Создание перекрытий") as t:
+                rooms_and_floors_dict = {}
+                t.Start()
+                for room in rooms:
+                    floor = self.floor_create(room, floor_type, level_offset)
+                    rooms_and_floors_dict[room] = floor
+                t.Commit()
+            with Transaction(doc, "BIM: Создание отверстий в перекрытии") as t:
+                t.Start()
+                for r, fl in rooms_and_floors_dict.items():
+                    opening_curve_arrays = RoomContour(r).get_curve_arrays_of_room()[1]
+                    self.openings_create(fl, opening_curve_arrays)
+                t.Commit()
+        else:
+            with Transaction(doc, "BIM: Создание перекрытий") as t:
+                t.Start()
+                for room in rooms:
+                    self.floor_create(room, floor_type, level_offset)
+                t.Commit()
 
 
 class CreateFloorsByRoomsCommand(ICommand):
