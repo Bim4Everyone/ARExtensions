@@ -8,6 +8,7 @@ clr.AddReference("dosymep.Bim4Everyone.dll")
 import pyevent
 
 from System.Windows.Input import ICommand
+from System import EventArgs
 
 from Autodesk.Revit.UI.Selection import ISelectionFilter
 from Autodesk.Revit.DB.Architecture import RoomFilter, Room
@@ -56,10 +57,7 @@ class ClassISelectionFilter(ISelectionFilter):
         self.element_class = element_class
 
     def AllowElement(self, elem):
-        if isinstance(elem, self.element_class) and elem.Area > 0:
-            return True
-        else:
-            return False
+        return isinstance(elem, self.element_class) and elem.Area > 0
 
     def AllowReference(self, ref, point):
         return True
@@ -135,7 +133,7 @@ class RevitRepository:
         room = FilteredElementCollector(doc) \
             .WherePasses(room_filter) \
             .FirstElement()
-        if isinstance(room, Room):
+        if room is not None:
             parameters_list = [p.Definition.Name for p in room.Parameters]
             return parameters_list
         return
@@ -156,18 +154,18 @@ class RoomContour:
 
     def get_curve_loops_of_room(self):
         '''
-        Возвращает список замкнутых петель из границ помещения (для Revit 2022 и новее)
+        Возвращает список замкнутых петель (с упрощенными кривыми) из границ помещения (для Revit 2022 и новее)
         '''
         spatial_element_boundary_options = SpatialElementBoundaryOptions()
-        curves = []
+        curve_loops = []
         loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
         if HOST_APP.is_newer_than(2021):
             for loop in loops:
-                curve = CurveLoop()
+                curves = []
                 for i in range(len(loop)):
-                    curve.Append(loop[i].GetCurve())
-                curves.append(self.simplify(curve))
-            return curves
+                    curves.append(loop[i].GetCurve())
+                curve_loops.append(self.simplify(curves))
+            return curve_loops
 
     def get_curve_arrays_of_room(self):
         '''
@@ -181,18 +179,31 @@ class RoomContour:
             prev_max_length = 0
             curves_for_openings = []
             for loop in loops:
-                curve = CurveArray()
+                curve = []
                 current_length = 0
                 for i in range(len(loop)):
-                    curve.Append(loop[i].GetCurve())
+                    curve.append(loop[i].GetCurve())
                 for c in curve:
                     current_length += c.Length
                 if current_length > prev_max_length:
                     prev_max_length = current_length
                     res_curve_array = curve
                 else:
-                    curves_for_openings.append(curve)
-            return res_curve_array, curves_for_openings
+                    curves_for_openings.append(self.simplify(curve))
+
+            correct_curve_array = self.simplify(res_curve_array)
+            return correct_curve_array, curves_for_openings
+
+    def are_join(self, curve, next_curve):
+        '''
+        Проверяет, соединен ли конец (XY) 1-й кривой и начало (XY) 2-й кривой
+        curve: текущая кривая
+        next_curve: следующая кривая
+        return: True, если 2 кривые имеют общую точку соединения, иначе False
+        '''
+        x1, x2 = round(curve.GetEndPoint(1)[0]), round(next_curve.GetEndPoint(0)[0])
+        y1, y2 = round(curve.GetEndPoint(1)[1]), round(next_curve.GetEndPoint(0)[1])
+        return x1 == x2 and y1 == y2
 
     def append_curve(self, curve, next_curve):
         '''
@@ -200,29 +211,28 @@ class RoomContour:
         совпадает с начальной точкой второй
         curve: текущая кривая
         next_curve: следующая кривая
-        return: True, если слияние кривых возможно и прошло успешно, иначе False
+        return: True и новую кривую, если слияние кривых возможно и прошло успешно, иначе False и ту же самую кривую
         '''
         if curve is not None and next_curve is not None:
             curve_vector = (curve.GetEndPoint(1) - curve.GetEndPoint(0)).Normalize()
             add_curve_vector = (next_curve.GetEndPoint(1) - next_curve.GetEndPoint(0)).Normalize()
             are_collinear = (isinstance(curve, Line) and isinstance(next_curve, Line)) and curve_vector.IsAlmostEqualTo(
                 add_curve_vector)
-            are_join = curve.GetEndPoint(1).IsAlmostEqualTo(next_curve.GetEndPoint(0))
+            are_join = self.are_join(curve, next_curve)
             if are_collinear and are_join:
                 new_curve = Line.CreateBound(curve.GetEndPoint(0), next_curve.GetEndPoint(1))
                 return True, new_curve
         return False, curve
 
-    def simplify(self, curve_loop):
+    def simplify(self, curves_list):
         '''
         Соединяет кривые у замкнутой петли (Loop), лежащие на одной прямой и возвращает новую упрощенную
         замкнутую петлю (Loop)
-        curve_loop: Замкнутая петля из кривых
+        curves_list: Список кривых
         return: Новая петля с оптимизированными кривыми, которые лежали на одной прямой друг за другом
         '''
-        simplified_curves = CurveLoop()
+        correct_curves = []
         curve_prev = None
-        curves_list = elements_to_list(curve_loop)
         for i in range(len(curves_list)):
             curve_current = curves_list[i]
             (curve_added, curve_prev) = self.append_curve(curve_prev, curve_current)
@@ -230,20 +240,30 @@ class RoomContour:
                 curve_prev = curve_current
                 continue
             if i != 0 and i != (len(curves_list) - 1) and (not curve_added):
-                simplified_curves.Append(curve_prev)
+                correct_curves.append(curve_prev)
                 curve_prev = curve_current
                 continue
             if i == (len(curves_list) - 1):
                 if curve_added:
-                    curve_prev = curve_added
-                    simplified_curves.Append(curve_prev)
+                    correct_curves.append(curve_prev)
                 else:
-                    simplified_curves.Append(curve_prev)
-                    simplified_curves.Append(curve_current)
-
-        return simplified_curves
+                    correct_curves.append(curve_prev)
+                    correct_curves.append(curve_current)
+        if HOST_APP.is_newer_than(2021):
+            simplified_curve_loop = CurveLoop()
+            for curve in correct_curves:
+                simplified_curve_loop.Append(curve)
+            return simplified_curve_loop
+        else:
+            simplified_curve_array = CurveArray()
+            for curve in correct_curves:
+                simplified_curve_array.Append(curve)
+            return simplified_curve_array
 
     def get_doors_in_rooms(self):
+        '''
+        Возвращает список всех дверей, которые пересекают помещение
+        '''
         room = self.room
         geo = room.get_Geometry(Options())
         for g in geo:
@@ -272,15 +292,14 @@ class CreateFloorsByRooms:
             level = doc.GetElement(room.LevelId)
             current_floor = doc.Create.NewFloor(curve_array, floor_type, level, False)
             converted_level_offset = convert_value(level_offset)
-            current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(converted_level_offset)
-            return current_floor
+            current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
         else:
             curve_loops = RoomContour(room).get_curve_loops_of_room()
             level_id = room.LevelId
             current_floor = Floor.Create(doc, curve_loops, floor_type.Id, level_id)
             converted_level_offset = convert_value(level_offset)
-            current_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(converted_level_offset)
-            return current_floor
+            current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
+        return current_floor
 
     def openings_create(self, floor, curves):
         if len(curves) != 0:
@@ -296,25 +315,20 @@ class CreateFloorsByRooms:
         level_offset: смещение от уровня (по умолчанию 0)
         '''
         if HOST_APP.is_older_than(2022):
-            with Transaction(doc, "BIM: Создание перекрытий") as t:
+            with revit.Transaction("BIM: Создание перекрытий"):
                 rooms_and_floors_dict = {}
-                t.Start()
                 for room in rooms:
                     floor = self.floor_create(room, floor_type, level_offset)
                     rooms_and_floors_dict[room] = floor
-                t.Commit()
-            with Transaction(doc, "BIM: Создание отверстий в перекрытии") as t:
-                t.Start()
+
+            with revit.Transaction("BIM: Создание отверстий в перекрытии"):
                 for r, fl in rooms_and_floors_dict.items():
                     opening_curve_arrays = RoomContour(r).get_curve_arrays_of_room()[1]
                     self.openings_create(fl, opening_curve_arrays)
-                t.Commit()
         else:
-            with Transaction(doc, "BIM: Создание перекрытий") as t:
-                t.Start()
+            with revit.Transaction("BIM: Создание перекрытий"):
                 for room in rooms:
                     self.floor_create(room, floor_type, level_offset)
-                t.Commit()
 
 
 class CreateFloorsByRoomsCommand(ICommand):
@@ -333,9 +347,6 @@ class CreateFloorsByRoomsCommand(ICommand):
         self.CanExecuteChanged -= value
 
     def OnCanExecuteChanged(self):
-        # В Python при работе с событиями нужно явно
-        # передавать импорт в обработчике события
-        from System import EventArgs
         self._canExecuteChanged(self, EventArgs.Empty)
 
     def ViewModel_PropertyChanged(self, sender, e):
@@ -493,7 +504,7 @@ def script_execute(plugin_logger):
 
     # Проверка на неразмещенные помещения с площадью == 0
     if len(all_rooms) == 0:
-        forms.alert("В проекте отсутствуют размещенные помещения")
+        forms.alert("В проекте отсутствуют размещенные помещения", exitscript=True)
         return
 
     main_window = MainWindow()
