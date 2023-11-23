@@ -113,16 +113,16 @@ class RevitRepository:
                          room.Location is not None and room.Area > 0]
         return correct_rooms
 
-    def select_rooms_on_view(self):
+    @staticmethod
+    def select_rooms_on_view(title):
         '''
         Функция реализует выбор элементов при помощи интерфейса ISelectionFilter и возвращает список выбранных
         пользователем помещений
         '''
-        elements = []
-        ref_list = uidoc.Selection.PickObjects(ObjectType.Element, ClassISelectionFilter(Room), "Выберите помещения")
-        for el in ref_list:
-            elements.append(doc.GetElement(el))
-        return elements
+        with WarningBar(title=title):
+            ref_list = uidoc.Selection.PickObjects(ObjectType.Element, ClassISelectionFilter(Room))
+            elements = [doc.GetElement(el) for el in ref_list]
+            return elements
 
     @reactive
     def room_parameters(self):
@@ -144,7 +144,8 @@ class RevitRepository:
 
     def __get_selected_rooms(self):
         selected_element_ids = uidoc.Selection.GetElementIds()
-        elements = [doc.GetElement(el) for el in selected_element_ids if isinstance(doc.GetElement(el), Room)]
+        elements = [doc.GetElement(el) for el in selected_element_ids if
+                    isinstance(doc.GetElement(el), Room) and doc.GetElement(el).Area > 0]
         return elements
 
 
@@ -302,6 +303,9 @@ class CreateFloorsByRooms:
         return current_floor
 
     def openings_create(self, floor, curves):
+        '''
+        Создает элемент категории "Вырезание проема в перекрытии" для указанного перекрытия
+        '''
         if len(curves) != 0:
             for curve in curves:
                 doc.Create.NewOpening(floor, curve, True)
@@ -339,6 +343,7 @@ class CreateFloorsByRoomsCommand(ICommand):
         self.__view_model = view_model
         self.__view_model.PropertyChanged += self.ViewModel_PropertyChanged
         self.__create_floors_by_view = CreateFloorsByRooms()
+        self.__revit_repository = RevitRepository(doc)
 
     def add_CanExecuteChanged(self, value):
         self.CanExecuteChanged += value
@@ -362,15 +367,23 @@ class CreateFloorsByRoomsCommand(ICommand):
 
     def Execute(self, parameter):
         if self.__view_model.is_checked_selected:
+            # Если пользователь выбрал создать перекрытия по предварительно выбранным помещениям
+
             self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.selected_rooms,
                                                                         self.__view_model.selected_floor_type,
                                                                         self.__view_model.level_offset)
+
         elif self.__view_model.is_checked_select:
-            select_rooms = RevitRepository(doc).select_rooms_on_view()
+            # Если пользователь выбрал создать перекрытия по выбранным помещениям
+
+            select_rooms = self.__revit_repository.select_rooms_on_view("Выберите помещения")
             self.__create_floors_by_view.create_floors_by_rooms_on_view(select_rooms,
                                                                         self.__view_model.selected_floor_type,
                                                                         self.__view_model.level_offset)
+
         elif self.__view_model.is_checked_on_view:
+            # Если пользователь выбрал создать перекрытия на активном виде
+
             self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.rooms_on_active_view,
                                                                         self.__view_model.selected_floor_type,
                                                                         self.__view_model.level_offset)
@@ -387,17 +400,17 @@ class MainWindow(WPFWindow):
 
 
 class MainWindowViewModel(Reactive):
-    def __init__(self, revit_info):
+    def __init__(self, revit_repository):
         Reactive.__init__(self)
-        self.__revit_info = revit_info
-        self.__floor_types = revit_info.floor_types
-        self.__rooms_on_active_view = revit_info.rooms_on_active_view
+        self.__revit_repository = revit_repository
+        self.__floor_types = revit_repository.floor_types
+        self.__rooms_on_active_view = revit_repository.rooms_on_active_view
 
         if len(self.__floor_types) > 0:
             self.__selected_floor_type = self.floor_types[0]
 
         self.__level_offset = "0"
-        self.__selected_rooms = revit_info.selected_rooms
+        self.__selected_rooms = revit_repository.selected_rooms
         self.__is_checked_select = True
         self.__is_checked_on_view = False
         self.__is_checked_selected = False
@@ -410,7 +423,7 @@ class MainWindowViewModel(Reactive):
         else:
             self.__is_checked_on_view_visibility = "Hidden"
 
-        self.__room_parameters = revit_info.room_parameters
+        self.__room_parameters = revit_repository.room_parameters
         self.__error_text = ""
         self.__create_floors_by_rooms = CreateFloorsByRoomsCommand(self)
 
@@ -505,7 +518,12 @@ def script_execute(plugin_logger):
     # Проверка на неразмещенные помещения с площадью == 0
     if len(all_rooms) == 0:
         forms.alert("В проекте отсутствуют размещенные помещения", exitscript=True)
-        return
+
+    rooms_on_active_view = revit_info.rooms_on_active_view
+
+    # Проверка наличия окруженных помещений на активном виде
+    if len(rooms_on_active_view) == 0:
+        forms.alert("На текущем виде нет окруженных помещений!", exitscript=True)
 
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_info)
