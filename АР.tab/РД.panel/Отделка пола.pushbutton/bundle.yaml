@@ -1,0 +1,16 @@
+title:
+  ru: >-
+    Отделка пола
+  en_us: >-
+    Floor finishing
+
+tooltip:
+  ru: На плане этажа создает перекрытия по выбранным помещениям.
+  en_us: On the floor plan, floors are created for the selected rooms.
+
+context: active-floor-plan
+
+author: DiBrainz
+
+min_revit_version: 2020
+max_revit_version: 2024
