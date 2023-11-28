@@ -54,7 +54,7 @@
                     Text="{Binding level_offset, FallbackValue=level_offset, UpdateSourceTrigger=PropertyChanged}"/>
             </Grid>
         </GroupBox>
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" >
             <Grid.RowDefinitions>
                 <RowDefinition/>
                 <RowDefinition/>
@@ -77,28 +77,23 @@
                              IsChecked="{Binding is_checked_on_view, FallbackValue=is_checked_on_view}">
                 </RadioButton>
             </StackPanel>
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.5*"/>
-                    <ColumnDefinition Width="1*"/>
-                    <ColumnDefinition Width="1.5*"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"
+            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10 0">
+                <TextBlock
                     Text="{Binding error_text, FallbackValue=ErrorText}"
                     Margin="5 0"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Right"
                     Foreground="Orange"/>
-                <Button Grid.Column="1"
-                        Content="Создать"
-                        Width="100"
-                        Height="25"
-                        VerticalAlignment="Center"
-                        Command="{Binding create_floors_by_rooms}"
-                        Click="ButtonOk_Click">
+                <Button
+                    Content="Создать"
+                    Width="100"
+                    Height="25"
+                    VerticalAlignment="Center"
+                    Command="{Binding create_floors_by_rooms}"
+                    Click="ButtonOk_Click">
                 </Button>
+            </StackPanel>
 
-            </Grid>
 
         </Grid>
     </Grid>

@@ -202,9 +202,16 @@ class RoomContour:
         next_curve: следующая кривая
         return: True, если 2 кривые имеют общую точку соединения, иначе False
         '''
-        x1, x2 = round(curve.GetEndPoint(1)[0]), round(next_curve.GetEndPoint(0)[0])
-        y1, y2 = round(curve.GetEndPoint(1)[1]), round(next_curve.GetEndPoint(0)[1])
-        return x1 == x2 and y1 == y2
+
+        x1, x2 = curve.GetEndPoint(1)[0], next_curve.GetEndPoint(0)[0]
+        diff_x = abs(x1 - x2)
+
+        y1, y2 = curve.GetEndPoint(1)[1], next_curve.GetEndPoint(0)[1]
+        diff_y = abs(y1 - y2)
+
+        res = diff_x < 0.01 and diff_y < 0.01
+
+        return res
 
     def append_curve(self, curve, next_curve):
         '''
@@ -261,21 +268,35 @@ class RoomContour:
                 simplified_curve_array.Append(curve)
             return simplified_curve_array
 
-    def get_doors_in_rooms(self):
+    def create_virtual_solid_of_room(self):
+        curve_loops = self.get_curve_loops_of_room()
+        max_length = 0
+        boundary_curve = curve_loops[0]
+        for curve_loop in curve_loops:
+            current_length = curve_loop.GetExactLength()
+            if current_length > max_length:
+                max_length = current_length
+                boundary_curve = curve_loop
+
+        new_curve_loop = boundary_curve.CreateViaOffset(boundary_curve, 0.2, XYZ(0, 0, 1))
+        virtual_solid = GeometryCreationUtilities.CreateExtrusionGeometry([new_curve_loop], XYZ(0, 0, 1), 10)
+
+        return virtual_solid
+
+    def get_doors_from_room(self):
         '''
         Возвращает список всех дверей, которые пересекают помещение
         '''
-        room = self.room
-        geo = room.get_Geometry(Options())
-        for g in geo:
-            if isinstance(g, Solid):
-                virtual_solid = g
+        virtual_solid = self.create_virtual_solid_of_room()
+
         intersect_filter = ElementIntersectsSolidFilter(virtual_solid)
         doors = (FilteredElementCollector(doc, active_view.Id)
                  .WhereElementIsNotElementType()
                  .OfCategory(BuiltInCategory.OST_Doors)
                  .WherePasses(intersect_filter))
-        return elements_to_list(doors)
+        list_doors = elements_to_list(doors)
+
+        return list_doors
 
 
 class CreateFloorsByRooms:
@@ -292,14 +313,15 @@ class CreateFloorsByRooms:
             curve_array = RoomContour(room).get_curve_arrays_of_room()[0]
             level = doc.GetElement(room.LevelId)
             current_floor = doc.Create.NewFloor(curve_array, floor_type, level, False)
-            converted_level_offset = convert_value(level_offset)
-            current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
+
         else:
             curve_loops = RoomContour(room).get_curve_loops_of_room()
             level_id = room.LevelId
             current_floor = Floor.Create(doc, curve_loops, floor_type.Id, level_id)
-            converted_level_offset = convert_value(level_offset)
-            current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
+
+        converted_level_offset = convert_value(level_offset)
+        current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
+
         return current_floor
 
     def openings_create(self, floor, curves):
@@ -368,7 +390,6 @@ class CreateFloorsByRoomsCommand(ICommand):
     def Execute(self, parameter):
         if self.__view_model.is_checked_selected:
             # Если пользователь выбрал создать перекрытия по предварительно выбранным помещениям
-
             self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.selected_rooms,
                                                                         self.__view_model.selected_floor_type,
                                                                         self.__view_model.level_offset)
