@@ -7,12 +7,12 @@
         Title="Отделка пола"
         mc:Ignorable="d"
         WindowStartupLocation="CenterScreen"
-        Height="250" Width="500"
+        Height="300" Width="600"
         ResizeMode="NoResize">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="6*"></RowDefinition>
-            <RowDefinition Height="4*"></RowDefinition>
+            <RowDefinition Height="7*"></RowDefinition>
+            <RowDefinition Height="3*"></RowDefinition>
         </Grid.RowDefinitions>
         <GroupBox
                 Grid.Row ="0" Grid.Column="0"
@@ -22,9 +22,10 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1.2*"/>
                     <ColumnDefinition Width="1*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock
@@ -34,24 +35,37 @@
                     HorizontalAlignment="Left"
                     Text="Тип перекрытия:"/>
                 <TextBlock
-                    Grid.Row="2" Grid.Column="0"
+                    Grid.Row="1" Grid.Column="0"
                     Margin="5"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Left"
                     Text="Смещение от уровня, мм:"/>
                 <ComboBox
+                    Grid.Row="2" Grid.Column="0"
+                    Margin="5 10 10 10"
+                    VerticalContentAlignment="Center"
+                    ItemsSource="{Binding doors_contours_options}"
+                    SelectedItem="{Binding selected_door_contour}"/>
+                <ComboBox
                     Grid.Row="0" Grid.Column="1"
-                    Margin="10"
+                    Margin="5 10"
                     DisplayMemberPath="Name"
                     VerticalContentAlignment="Center"
                     ItemsSource="{Binding floor_types}"
                     SelectedItem="{Binding selected_floor_type}"/>
                 <TextBox
+                    Grid.Row ="1" Grid.Column="1"
+                    TextAlignment="Right"
+                    VerticalContentAlignment="Center"
+                    Margin="5 10"
+                    Text="{Binding level_offset, FallbackValue=level_offset, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox
                     Grid.Row ="2" Grid.Column="1"
                     TextAlignment="Right"
                     VerticalContentAlignment="Center"
-                    Margin="10"
-                    Text="{Binding level_offset, FallbackValue=level_offset, UpdateSourceTrigger=PropertyChanged}"/>
+                    Margin="5 10"
+                    IsEnabled="{Binding is_enabled_door_contour_offset, FallbackValue=is_enabled_door_contour_offset, UpdateSourceTrigger=PropertyChanged}"
+                    Text="{Binding door_contour_offset, FallbackValue=door_contour_offset, UpdateSourceTrigger=PropertyChanged}"/>
             </Grid>
         </GroupBox>
         <Grid Grid.Row="1" >
