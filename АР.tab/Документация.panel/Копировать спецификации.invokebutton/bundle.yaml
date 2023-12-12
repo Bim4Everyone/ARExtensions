@@ -1,0 +1,18 @@
+title:
+  ru: >-
+    Копировать 
+    
+    спецификации
+  en_us: Copy schedules
+
+tooltip:
+  ru: Копирует на выбранные листы указанные видовые экраны спецификаций, изменяя фильтрацию по номеру этажа.
+  en_us: Copies the specified schedule viewports to the selected sheets, changing the filtering by floor number.
+
+assembly: RevitArchitecturalDocumentation.dll
+command_class: RevitCopySpecSheetInstanceCommand
+
+author: DivinN
+
+min_revit_version: 2020
+max_revit_version: 2024
