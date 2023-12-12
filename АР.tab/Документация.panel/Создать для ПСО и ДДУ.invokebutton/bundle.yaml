@@ -1,0 +1,18 @@
+title:
+  ru: >-
+    Создать 
+    
+    для ПСО и ДДУ
+  en_us: Create for PSO and ASP
+
+tooltip:
+  ru: Создает листы, виды, спецификации и размещает виды и спецификации на листах в соответствии с выбором пользователя.
+  en_us: Creates sheets, views, specifications and places views and specifications on sheets according to user selection.
+
+assembly: RevitArchitecturalDocumentation.dll
+command_class: RevitCreatingARDocsCommand
+
+author: DivinN
+
+min_revit_version: 2020
+max_revit_version: 2024
