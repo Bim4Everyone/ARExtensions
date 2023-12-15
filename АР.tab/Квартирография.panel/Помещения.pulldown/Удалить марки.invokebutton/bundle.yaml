@@ -1,0 +1,15 @@
+title:
+  ru: Удалить марки
+  en_us: Remove room tags
+
+tooltip:
+  ru: Удаляет или перемещает указанные марки на выбранных видах.
+  en_us: Removes or moves the specified room tags in the selected views.
+
+assembly: RevitRemoveRoomTags.dll
+command_class: RevitRemoveRoomTagsCommand
+
+author: DivinN
+
+min_revit_version: 2020
+max_revit_version: 2024
