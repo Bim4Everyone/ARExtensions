@@ -11,8 +11,8 @@
         ResizeMode="NoResize">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="7*"></RowDefinition>
-            <RowDefinition Height="3*"></RowDefinition>
+            <RowDefinition Height="6.5*"></RowDefinition>
+            <RowDefinition Height="3.5*"></RowDefinition>
         </Grid.RowDefinitions>
         <GroupBox
                 Grid.Row ="0" Grid.Column="0"
@@ -45,7 +45,7 @@
                     Margin="5 10 10 10"
                     VerticalContentAlignment="Center"
                     ItemsSource="{Binding doors_contours_options}"
-                    SelectedItem="{Binding selected_door_contour}"/>
+                    SelectedItem="{Binding selected_door_contour_option}"/>
                 <ComboBox
                     Grid.Row="0" Grid.Column="1"
                     Margin="5 10"
