@@ -193,13 +193,21 @@ class RoomContour:
         spatial_element_boundary_options = SpatialElementBoundaryOptions()
         curve_loops = []
         loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
+        for loop in loops:
+            curves = []
+            for i in range(len(loop)):
+                curves.append(loop[i].GetCurve())
+            curve_loops.append(self.simplify(curves))
         if HOST_APP.is_newer_than(2021):
-            for loop in loops:
-                curves = []
-                for i in range(len(loop)):
-                    curves.append(loop[i].GetCurve())
-                curve_loops.append(self.simplify(curves))
             return curve_loops
+        else:
+            new_curve_loops = []
+            for curve_loop in curve_loops:
+                curve = CurveLoop()
+                for loop in curve_loop:
+                    curve.Append(loop)
+                new_curve_loops.append(curve)
+            return new_curve_loops
 
     def get_curve_arrays_of_room(self):
         '''
@@ -227,6 +235,26 @@ class RoomContour:
 
             correct_curve_array = self.simplify(res_curve_array)
             return correct_curve_array, curves_for_openings
+
+    def curve_loop_into_curve_array(self, curve_loop):
+        curve_array = CurveArray()
+        for curve in curve_loop:
+            curve_array.Append(curve)
+        return curve_array
+
+    def get_curve_arrays_with_doors(self, mode=1, distance_from_user=0):
+        '''
+        Возвращает самый длинный массив кривых (ограничивающий контур) из границ помещения, а также список массивов
+        кривых, если они есть внутри помещения (для Revit 2021 и старше) с дверными проемами
+        '''
+
+        new_curve_loops = self.get_curve_loops_with_doors(mode, distance_from_user)
+        new_curve_loops = sorted(new_curve_loops, key=lambda x: x.GetExactLength(), reverse=True)
+
+        boundary_curve_array = self.curve_loop_into_curve_array(new_curve_loops[0])
+        curves_for_openings = [self.curve_loop_into_curve_array(curve_loop) for curve_loop in new_curve_loops[1:]]
+
+        return boundary_curve_array, curves_for_openings
 
     def are_join(self, curve, next_curve):
         '''
@@ -301,22 +329,6 @@ class RoomContour:
                 simplified_curve_array.Append(curve)
             return simplified_curve_array
 
-    # def create_virtual_solid_of_room(self, offset=0):
-    #     '''
-    #     Создает виртуальный Solid по контуру помещения со смещением наружу на указанное расстояние в мм
-    #     return: Виртуальный Solid помещения
-    #     '''
-    #     curve_loops = self.get_curve_loops_of_room()
-    #     max_length = 0
-    #     boundary_curve = curve_loops[0]
-    #     for curve_loop in curve_loops:
-    #         current_length = curve_loop.GetExactLength()
-    #         if current_length > max_length:
-    #             max_length = current_length
-    #             boundary_curve = curve_loop
-    #     new_curve_loop = boundary_curve.CreateViaOffset(boundary_curve, convert_to_value(offset), XYZ(0, 0, 1))
-    #     virtual_solid = GeometryCreationUtilities.CreateExtrusionGeometry([new_curve_loop], XYZ(0, 0, 1), 10)
-    #     return virtual_solid
     def create_virtual_solid_of_room(self, offset=0):
         '''
         Создает виртуальный Solid по контуру помещения со смещением наружу на указанное расстояние в мм
@@ -335,7 +347,7 @@ class RoomContour:
         '''
         Возвращает список всех дверей, которые пересекают виртуальный Solid помещения
         '''
-        virtual_solid = self.create_virtual_solid_of_room(0)
+        virtual_solid = self.create_virtual_solid_of_room(1)
 
         intersect_filter = ElementIntersectsSolidFilter(virtual_solid)
         doors = (FilteredElementCollector(doc, active_view.Id)
@@ -701,12 +713,12 @@ class RoomContour:
                 closest = point
         return closest
 
-    def get_lower_curve_loop_from_solid(self, solid):
+    def get_lower_curve_loops_from_solid(self, solid):
         for face in solid.Faces:
             if face.FaceNormal[2] == -1:
                 return face.GetEdgesAsCurveLoops()
 
-    def get_curve_loop_with_doors(self, mode=1, distance_from_user=0):
+    def get_curve_loops_with_doors(self, mode=1, distance_from_user=0):
         '''
         Создает новую петлю кривых (CurveLoop()) помещения с дверными проемами
         '''
@@ -727,7 +739,7 @@ class RoomContour:
                 except:
                     continue
 
-        new_curve_loops = self.get_lower_curve_loop_from_solid(room_solid)
+        new_curve_loops = self.get_lower_curve_loops_from_solid(room_solid)
 
         return new_curve_loops
 
@@ -743,14 +755,18 @@ class CreateFloorsByRooms:
         level_offset: смещение от уровня (по умолчанию 0)
         '''
         if HOST_APP.is_older_than(2022):
-            curve_array = RoomContour(room).get_curve_arrays_of_room()[0]
+            if mode > 0:
+                curve_array = RoomContour(room).get_curve_arrays_with_doors(mode, distance_from_user)[0]
+            else:
+                curve_array = RoomContour(room).get_curve_arrays_of_room()[0]
             level = doc.GetElement(room.LevelId)
             current_floor = doc.Create.NewFloor(curve_array, floor_type, level, False)
 
         else:
-            curve_loops = RoomContour(room).get_curve_loops_of_room()
             if mode > 0:
-                curve_loops = RoomContour(room).get_curve_loop_with_doors(mode, distance_from_user)
+                curve_loops = RoomContour(room).get_curve_loops_with_doors(mode, distance_from_user)
+            else:
+                curve_loops = RoomContour(room).get_curve_loops_of_room()
             level_id = room.LevelId
             current_floor = Floor.Create(doc, curve_loops, floor_type.Id, level_id)
 
@@ -784,7 +800,10 @@ class CreateFloorsByRooms:
 
             with revit.Transaction("BIM: Создание отверстий в перекрытии"):
                 for r, fl in rooms_and_floors_dict.items():
-                    opening_curve_arrays = RoomContour(r).get_curve_arrays_of_room()[1]
+                    if mode > 0:
+                        opening_curve_arrays = RoomContour(r).get_curve_arrays_with_doors(mode, distance_from_user)[1]
+                    else:
+                        opening_curve_arrays = RoomContour(r).get_curve_arrays_of_room()[1]
                     self.openings_create(fl, opening_curve_arrays)
         else:
             with revit.Transaction("BIM: Создание перекрытий"):
@@ -833,15 +852,6 @@ class CreateFloorsByRoomsCommand(ICommand):
     def Execute(self, parameter):
         if self.__view_model.is_checked_selected:
             # Если пользователь выбрал создать перекрытия по предварительно выбранным помещениям
-            # with revit.Transaction("Test"):
-            #     for room in self.__view_model.selected_rooms:
-            #         RoomContour(room).get_curve_loop_with_doors()
-            # try:
-            #     RoomContour(room).create_new_curve_loop()
-            # except:
-            #     print("Не удалось обработать следующие помещения: " + str(room.Id))
-
-            # RoomContour(self.__view_model.selected_rooms[0]).create_new_curve_loop()
 
             self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.selected_rooms,
                                                                         self.__view_model.selected_floor_type,
@@ -1048,12 +1058,7 @@ def script_execute(plugin_logger):
     # Проверка наличия окруженных помещений на активном виде
     if len(rooms_on_active_view) == 0:
         forms.alert("На текущем виде нет окруженных помещений!", exitscript=True)
-    # x1 = XYZ(60.247, 249.96, 0.65)
-    # x2 = XYZ(60.247, 248.32, 0.65)
-    # line = Line.CreateBound(x1, x2)
-    # # line_for_check(line)
-    # with revit.Transaction("TEST"):
-    #     doc.Create.NewModelCurve(line, SketchPlane.Create(doc, Plane.CreateByNormalAndOrigin(XYZ.BasisZ, x1)))
+
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_info)
     main_window.show_dialog()
