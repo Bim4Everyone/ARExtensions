@@ -80,6 +80,11 @@ def selected_index_of_dict(value):
     return 0
 
 
+def show_error_message(ids):
+    ids_str = ", ".join(str(i) for i in ids)
+    forms.alert("Не удалось создать пол по контуру помещения:", "РЕЗУЛЬТАТ", ids_str)
+
+
 class ClassISelectionFilter(ISelectionFilter):
     def __init__(self, element_class):
         self.element_class = element_class
@@ -330,7 +335,7 @@ class RoomContour:
         '''
         Возвращает список всех дверей, которые пересекают виртуальный Solid помещения
         '''
-        virtual_solid = self.create_virtual_solid_of_room(300)
+        virtual_solid = self.create_virtual_solid_of_room(0)
 
         intersect_filter = ElementIntersectsSolidFilter(virtual_solid)
         doors = (FilteredElementCollector(doc, active_view.Id)
@@ -416,7 +421,7 @@ class RoomContour:
         door_location = self.get_door_location(door)
         door_vector = self.get_vector_from_door(door)
         normal_vector = XYZ.BasisZ.CrossProduct(door_vector).Normalize()
-        z = convert_to_value(200)
+        z = convert_to_value(200) + door_location[2]
         dist_const_left_right = convert_to_value(6000)
         dist_const_top_bottom = convert_to_value(500)
         start_point = XYZ(door_location[0], door_location[1], z)
@@ -524,6 +529,7 @@ class RoomContour:
         intersect_opt_outside = SolidCurveIntersectionOptions()
         intersect_opt_outside.ResultType = SolidCurveIntersectionMode.CurveSegmentsOutside
         intersect = room_solid.IntersectWithCurve(line, intersect_opt_inside)
+
         if intersect.SegmentCount < 1:
             # Если линия, запущенная вверх не пересекла Solid помещения - создание линии по направлению вниз от проема
             # и повторная проверка на пересечение
@@ -545,6 +551,51 @@ class RoomContour:
         distance = ((point_a.X - point_b.X) ** 2 + (point_a.Y - point_b.Y) ** 2) ** 0.5
         return distance
 
+    def get_door_thickness_line(self, door, wall_solid, intersect_coord, is_right):
+        # Создание линии, перпендикулярной линии, полученной из результата первого пересечения с линией вправо/влево
+        line = self.create_line_from_xyz(door, intersect_coord, is_right)
+
+        # Получение линии, соответствующей толщине дверного проема при помощи проверки на пересечение с Solid стен
+        intersect_opt_inside = SolidCurveIntersectionOptions()
+        second_intersect = wall_solid.IntersectWithCurve(line, intersect_opt_inside)
+        line_of_door_thickness = second_intersect.GetCurveSegment(0)
+
+        # Упрощение до 1 линии, если сегментов более 1
+        if second_intersect.SegmentCount > 1:
+            line_of_door_thickness = self.create_new_line_from_segments(second_intersect)
+
+        return line_of_door_thickness
+
+    def get_start_point_for_door_contour(self, line_of_door_thickness, boundary_point_in_door_center):
+        points = []
+        check_start_point = line_of_door_thickness.GetEndPoint(0)
+        points.append(check_start_point)
+        check_end_point = line_of_door_thickness.GetEndPoint(1)
+        points.append(check_end_point)
+        start_point = self.closest_point_to_target(boundary_point_in_door_center, points)
+        distance = convert_from_value(self.get_distance_from_two_points(check_start_point, check_end_point))
+        if start_point == check_end_point:
+            line_of_door_thickness = line_of_door_thickness.CreateReversed()
+        return start_point, line_of_door_thickness, distance
+
+    def get_half_line_from_line_of_door_thickness(self, start_point, line_of_door_thickness,
+                                                  distance,
+                                                  is_right):
+        if distance > 2:
+            end_point = line_of_door_thickness.Evaluate(0.5, True)
+            if is_right:
+                line_of_door_thickness = Line.CreateBound(start_point, end_point)
+            else:
+                line_of_door_thickness = Line.CreateBound(start_point, end_point).CreateReversed()
+        return line_of_door_thickness
+
+    def get_specified_line(self, start_point, distance_from_user, line_of_door_thickness):
+        if 1 < float(distance_from_user) < convert_from_value(line_of_door_thickness.Length):
+            percents = int(distance_from_user) / convert_from_value(line_of_door_thickness.Length)
+            end_point = line_of_door_thickness.Evaluate(percents, True)
+            line_of_door_thickness = Line.CreateBound(start_point, end_point)
+            return line_of_door_thickness
+
     def get_door_curve_loop(self, door, mode=1, distance_from_user=0):
         '''
         Возвращает петлю кривых дверного проема, полученную из пересечения с линией, созданной из центра дверного проема
@@ -559,7 +610,6 @@ class RoomContour:
         wall_solid = self.get_solid_from_host_walls(door)
         room_solid = self.create_virtual_solid_of_room()
         boundary_point_in_door_center = self.get_boundary_point_from_room_in_door_center(door, room_solid)
-
         # Проверка на пересечение линии, запущенной вправо
         intersect_opt_inside = SolidCurveIntersectionOptions()
         intersect_opt_outside = SolidCurveIntersectionOptions()
@@ -590,47 +640,22 @@ class RoomContour:
         # Получение ширины проема
         door_width = line_of_half_door_width.Length * 2
 
-        # Создание линии, перпендикулярной линии, полученной из результата первого пересечения
-        second_line = self.create_line_from_xyz(door, intersect_coord, is_right)
-
-        # Получение линии, соответствующей толщине дверного проема при помощи проверки на пересечение с Solid стен
-        intersect_opt_inside = SolidCurveIntersectionOptions()
-        second_intersect = wall_solid.IntersectWithCurve(second_line, intersect_opt_inside)
-        line_of_door_thickness = second_intersect.GetCurveSegment(0)
-
-        # Упрощение до 1 линии, если сегментов более 1
-        if second_intersect.SegmentCount > 1:
-            line_of_door_thickness = self.create_new_line_from_segments(second_intersect)
+        # Получение линии толщины проема
+        line_of_door_thickness = self.get_door_thickness_line(door, wall_solid, intersect_coord, is_right)
 
         door_vector = self.get_vector_from_door(door)
 
-        points = []
-        check_start_point = line_of_door_thickness.GetEndPoint(0)
-        points.append(check_start_point)
-        check_end_point = line_of_door_thickness.GetEndPoint(1)
-        points.append(check_end_point)
-        start_point = self.closest_point_to_target(boundary_point_in_door_center, points)
-        if start_point == check_end_point:
-            line_of_door_thickness = line_of_door_thickness.CreateReversed()
+        start_point, line_of_door_thickness, distance = self.get_start_point_for_door_contour(line_of_door_thickness,
+                                                                                              boundary_point_in_door_center)
+
         if mode == 2:
-            distance = convert_from_value(self.get_distance_from_two_points(check_start_point, check_end_point))
-            if distance > 2:
-                end_point = line_of_door_thickness.Evaluate(0.5, True)
-                if is_right:
-                    line_of_door_thickness = Line.CreateBound(start_point, end_point)
-                else:
-                    line_of_door_thickness = Line.CreateBound(start_point, end_point).CreateReversed()
+            line_of_door_thickness = self.get_half_line_from_line_of_door_thickness(start_point, line_of_door_thickness,
+                                                                                    distance,
+                                                                                    is_right)
         elif mode == 3:
+            line_of_door_thickness = self.get_specified_line(start_point, distance_from_user, line_of_door_thickness)
 
-            if 1 < float(distance_from_user) < convert_from_value(line_of_door_thickness.Length):
-                percents = int(distance_from_user) / convert_from_value(line_of_door_thickness.Length)
-                end_point = line_of_door_thickness.Evaluate(percents, True)
-                line_of_door_thickness = Line.CreateBound(start_point, end_point)
-                doc.Create.NewDetailCurve(active_view, line_of_door_thickness)
-            else:
-                return None
-
-                # Создание петли кривых по исходным данным, полученным из результатов пересечения
+        # Создание петли кривых по исходным данным, полученным из результатов пересечения
         door_curve_loop = self.create_rectangle_door_curve_loop(is_right, door_vector, door_width,
                                                                 line_of_door_thickness)
         return door_curve_loop
@@ -688,19 +713,20 @@ class RoomContour:
 
         room_curve_loops = self.get_curve_loops_of_room()
         doors = self.get_doors_from_room()
-
         room_solid = GeometryCreationUtilities.CreateExtrusionGeometry(room_curve_loops, XYZ(0, 0, 1), 1)
-        # direct_shape = DirectShape.CreateElement(doc, ElementId(BuiltInCategory.OST_GenericModel))
         if len(doors) > 0:
             z = self.get_z_from_curve_loops(room_curve_loops)
             for door in doors:
-                door_curve_loop = self.get_door_curve_loop(door, mode, distance_from_user)
-                if door_curve_loop != None:
+                try:
+                    door_curve_loop = self.get_door_curve_loop(door, mode, distance_from_user)
                     door_curve_loop = self.create_curve_loop_equal_to_Z(z, door_curve_loop)
                     door_solid = GeometryCreationUtilities.CreateExtrusionGeometry([door_curve_loop], XYZ(0, 0, 1), 1)
 
                     room_solid = BooleanOperationsUtils.ExecuteBooleanOperation(room_solid, door_solid,
                                                                                 BooleanOperationsType.Union)
+                except:
+                    continue
+
         new_curve_loops = self.get_lower_curve_loop_from_solid(room_solid)
 
         return new_curve_loops
@@ -762,8 +788,14 @@ class CreateFloorsByRooms:
                     self.openings_create(fl, opening_curve_arrays)
         else:
             with revit.Transaction("BIM: Создание перекрытий"):
+                error_ids = []
                 for room in rooms:
-                    self.floor_create(room, floor_type, mode, distance_from_user, level_offset)
+                    try:
+                        self.floor_create(room, floor_type, mode, distance_from_user, level_offset)
+                    except:
+                        error_ids.append(room.Id)
+            if len(error_ids) > 0:
+                show_error_message(error_ids)
 
 
 class CreateFloorsByRoomsCommand(ICommand):
@@ -1016,7 +1048,12 @@ def script_execute(plugin_logger):
     # Проверка наличия окруженных помещений на активном виде
     if len(rooms_on_active_view) == 0:
         forms.alert("На текущем виде нет окруженных помещений!", exitscript=True)
-
+    # x1 = XYZ(60.247, 249.96, 0.65)
+    # x2 = XYZ(60.247, 248.32, 0.65)
+    # line = Line.CreateBound(x1, x2)
+    # # line_for_check(line)
+    # with revit.Transaction("TEST"):
+    #     doc.Create.NewModelCurve(line, SketchPlane.Create(doc, Plane.CreateByNormalAndOrigin(XYZ.BasisZ, x1)))
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_info)
     main_window.show_dialog()
