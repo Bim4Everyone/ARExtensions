@@ -85,6 +85,47 @@ def show_error_message(ids):
     forms.alert("Не удалось создать пол по контуру помещения:", "РЕЗУЛЬТАТ", ids_str)
 
 
+class DoorsWithPoints:
+    def __init__(self, doors):
+        self.doors = doors
+
+    def get_doors_from_room(self, room):
+        doors_in_room = []
+        for door in self.doors:
+            points = door.points
+            for point in points:
+                if room.IsPointInRoom(point):
+                    doors_in_room.append(door.revit_door)
+        return doors_in_room
+
+
+class DoorWithPoints:
+    def __init__(self, door):
+        self.door = door
+        self.__points = self.__create_two_points()
+
+    @reactive
+    def revit_door(self):
+        return self.door
+
+    @reactive
+    def points(self):
+        return self.__points
+
+    def __create_two_points(self):
+        '''
+        ДОПИСАТЬ
+        '''
+        door_location = RoomContour.get_door_location(self.door)
+        door_vector = RoomContour.get_vector_from_door(self.door)
+        z = convert_to_value(200) + door_location[2]
+        dist_const_top_bottom = convert_to_value(600)
+        top_point = XYZ(door_location[0], door_location[1], z) + door_vector * dist_const_top_bottom
+        bottom_point = XYZ(door_location[0], door_location[1], z) - door_vector * dist_const_top_bottom
+
+        return top_point, bottom_point
+
+
 class ClassISelectionFilter(ISelectionFilter):
     def __init__(self, element_class):
         self.element_class = element_class
@@ -104,6 +145,7 @@ class RevitRepository:
         self.__rooms_on_active_view = self.__collect_rooms_on_active_view()
         self.__room_parameters = self.__get_room_parameters()
         self.__selected_rooms = self.__get_selected_rooms()
+        self.__doors_on_active_view = self.__get_doors_on_active_view()
 
     @reactive
     def floor_types(self):
@@ -181,14 +223,40 @@ class RevitRepository:
                     isinstance(doc.GetElement(el), Room) and doc.GetElement(el).Area > 0]
         return elements
 
+    @reactive
+    def all_doors_on_active_view(self):
+        return self.__doors_on_active_view
+
+    def __get_doors_on_active_view(self):
+        doors = FilteredElementCollector(doc, active_view.Id).WhereElementIsNotElementType().OfCategory(
+            BuiltInCategory.OST_Doors).ToElements()
+        elements = elements_to_list(doors)
+        return elements
+
 
 class RoomContour:
     def __init__(self, room):
         self.room = room
+        self.revit_info = RevitRepository(doc)
+
+    def curve_arrays_into_curve_loops(self, curve_arrays):
+        '''
+        Создает список из замкнутых петель (CurveLoop()) из списка массива кривых (CurveArray()) для использования при
+        создании виртуального Solid помещения для Revit 2020-2021
+        curve_arrays: Список из массивов кривых
+        return: список из CurveLoop()
+        '''
+        curve_loops = []
+        for curve_array in curve_arrays:
+            curve = CurveLoop()
+            for loop in curve_array:
+                curve.Append(loop)
+            curve_loops.append(curve)
+        return curve_loops
 
     def get_curve_loops_of_room(self):
         '''
-        Возвращает список замкнутых петель (с упрощенными кривыми) из границ помещения (для Revit 2022 и новее)
+        Возвращает список замкнутых петель (с упрощенными кривыми) из границ помещения
         '''
         spatial_element_boundary_options = SpatialElementBoundaryOptions()
         curve_loops = []
@@ -201,18 +269,13 @@ class RoomContour:
         if HOST_APP.is_newer_than(2021):
             return curve_loops
         else:
-            new_curve_loops = []
-            for curve_loop in curve_loops:
-                curve = CurveLoop()
-                for loop in curve_loop:
-                    curve.Append(loop)
-                new_curve_loops.append(curve)
-            return new_curve_loops
+            return self.curve_arrays_into_curve_loops(curve_loops)
 
     def get_curve_arrays_of_room(self):
         '''
         Возвращает самый длинный массив кривых (ограничивающий контур) из границ помещения, а также список массивов
-        кривых, если они есть внутри помещения (для Revit 2021 и старше)
+        кривых, если они есть внутри помещения (для Revit 2020-2021) для построения отверстий внутри перекрытия
+        return: Ограничивающий контур помещения, список из кривых для построения отверстий внутри перекрытия
         '''
         spatial_element_boundary_options = SpatialElementBoundaryOptions()
         loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
@@ -245,7 +308,13 @@ class RoomContour:
     def get_curve_arrays_with_doors(self, mode=1, distance_from_user=0):
         '''
         Возвращает самый длинный массив кривых (ограничивающий контур) из границ помещения, а также список массивов
-        кривых, если они есть внутри помещения (для Revit 2021 и старше) с дверными проемами
+        кривых, если они есть внутри помещения (для Revit 2020-2021) с дверными проемами для построения отверстий
+        внутри перекрытия
+        mode: режим, выбранный пользователем при создании перекрытия (0 - без заведения перекрытия в дверные проемы
+        1 - с заведением перекрытия в дверные проемы на всю толщину, 2 - с заведением перекрытия в дверные проемы
+        до середины толщины, 3 - с заведением перекрытия в дверные проемы на указанную длину в пределах толщины, в мм)
+        distance_from_user: указанная длина, на которую нужно завести перекрытие в дверной проем, если выбран mode = 3
+        return: Ограничивающий контур помещения, список из кривых для построения отверстий внутри перекрытия
         '''
 
         new_curve_loops = self.get_curve_loops_with_doors(mode, distance_from_user)
@@ -332,6 +401,7 @@ class RoomContour:
     def create_virtual_solid_of_room(self, offset=0):
         '''
         Создает виртуальный Solid по контуру помещения со смещением наружу на указанное расстояние в мм
+        offset: смещение контура Solid помещения наружу, в мм
         return: Виртуальный Solid помещения
         '''
         curve_loops = self.get_curve_loops_of_room()
@@ -343,37 +413,34 @@ class RoomContour:
         virtual_solid = GeometryCreationUtilities.CreateExtrusionGeometry(new_curve_loops, XYZ(0, 0, 1), 10)
         return virtual_solid
 
+    # def get_doors_from_room(self):
+    #     '''
+    #     Возвращает список всех дверей, которые пересекают виртуальный Solid помещения
+    #     '''
+    #     virtual_solid = self.create_virtual_solid_of_room(10)
+    #
+    #     intersect_filter = ElementIntersectsSolidFilter(virtual_solid)
+    #     doors = (FilteredElementCollector(doc, active_view.Id)
+    #              .WhereElementIsNotElementType()
+    #              .OfCategory(BuiltInCategory.OST_Doors)
+    #              .WherePasses(intersect_filter))
+    #     list_doors = elements_to_list(doors)
+    #     return list_doors
     def get_doors_from_room(self):
         '''
         Возвращает список всех дверей, которые пересекают виртуальный Solid помещения
         '''
-        virtual_solid = self.create_virtual_solid_of_room(1)
+        all_doors = self.revit_info.all_doors_on_active_view
+        doors = []
+        for door in all_doors:
+            doors.append(DoorWithPoints(door))
+        doors_with_points = DoorsWithPoints(doors)
+        doors_in_room = doors_with_points.get_doors_from_room(self.room)
+        return doors_in_room
 
-        intersect_filter = ElementIntersectsSolidFilter(virtual_solid)
-        doors = (FilteredElementCollector(doc, active_view.Id)
-                 .WhereElementIsNotElementType()
-                 .OfCategory(BuiltInCategory.OST_Doors)
-                 .WherePasses(intersect_filter))
-        list_doors = elements_to_list(doors)
-        return list_doors
-
-    def get_door_location(self, door):
+    @staticmethod
+    def get_door_location(door):
         return door.Location.Point
-
-    # def closest_point_xyz(self, target, point, min_distance=float('inf')):
-    #     '''
-    #     Возвращает минимальную дистанцию и ближайшую точку к целевой точке
-    #     target: целевая точка, для которой нужно вычислить минимальную дистанцию и ближайшую точку
-    #     point: проверяемая точка, для которой будет выполняться проверка минимальной дистанции до целевой точки
-    #     min_distance: минимальное расстояние, переданное в функцию для проверки расстояния до целевой точки
-    #     return: минимальное расстояние до целевой точки, ближайшая точка к целевой точке
-    #     '''
-    #     distance = (point[0] - target[0]) ** 2 + (point[1] - target[1]) ** 2 + (point[2] - target[2]) ** 2
-    #     closest = target
-    #     if distance < min_distance:
-    #         closest = point
-    #         min_distance = distance
-    #     return min_distance, closest
 
     def get_solid_from_element(self, element):
         '''
@@ -394,15 +461,15 @@ class RoomContour:
     def get_solid_from_host_walls(self, door):
         '''
         Возвращает объединенный Solid из стен, которые присоединены к основе стены двери
-        door: дверь, из которой будет взята основа стена
-        return: объединенный Solid из стен, которые присоединены к основе стены двери
+        door: дверь, из которой будет взята основа-стена
+        return: объединенный Solid из стен, которые присоединены к основе-стене двери
         '''
         opt = Options()
         opt.DetailLevel = ViewDetailLevel.Fine
         wall = door.Host
         host_solid = self.get_solid_from_element(wall)
-        joined_elementIds = JoinGeometryUtils.GetJoinedElements(doc, wall)
-        joined_elements = [doc.GetElement(wall) for wall in joined_elementIds]
+        joined_element_ids = JoinGeometryUtils.GetJoinedElements(doc, wall)
+        joined_elements = [doc.GetElement(wall) for wall in joined_element_ids]
         if len(joined_elements) > 0:
             for i in range(len(joined_elements)):
                 current_solid = self.get_solid_from_element(joined_elements[i])
@@ -418,7 +485,8 @@ class RoomContour:
             return res_solid
         return host_solid
 
-    def get_vector_from_door(self, door):
+    @staticmethod
+    def get_vector_from_door(door):
         door_normal = door.FacingOrientation.Normalize()
         return door_normal
 
@@ -427,8 +495,10 @@ class RoomContour:
         Создает линию из центра дверного проема, поднятую на определенное расстояние, в сторону стен (вправо или влево
         от проема) с длиной равной константе, в мм
         door: целевая дверь, из центра которой будет создана линия
-        mode: режим создания линии - вправо или влево от центра дверного проема ("right"/"left")
-        return: линия, созданная из центра дверного проема, направление линии - True, если линия вправо, False - влево
+        mode: режим создания линии - вправо, влево, вверх или вниз от центра дверного проема в плане ("right", "left",
+        "top", "bottom")
+        return: line - линия, созданная из центра дверного проема; is_right - направление линии - True, если линия
+        вправо, False - влево, используется также и для режимов "top" и "bottom"
         '''
         door_location = self.get_door_location(door)
         door_vector = self.get_vector_from_door(door)
@@ -456,8 +526,7 @@ class RoomContour:
         Создает линию, перпендикулярную ширине проема, из указанной точки, равной константе, в мм
         door: целевая дверь, у которой будет взят вектор направления
         point: точка, которая будет являться центром создаваемой линии
-        mode: режим построения линии ("right"/"left"), в зависимости от этого, будет меняться направление
-        построения линии
+        is_right: bool направления создания до этого линии из центра проема (True - вправо, False - влево)
         return: линия, созданная перпендикулярно ширине проема
         '''
         dist_const = convert_to_value(1000)
@@ -472,7 +541,7 @@ class RoomContour:
 
     def create_one_line_from_two_segments(self, prev_line, current_line):
         '''
-        Создает новую линию из начальных точек предыдущей линии и конечных текущей линии
+        Создает новую линию из начальной точки предыдущей линии и конечной текущей линии
         prev_line: предыдущая линия
         current_line: текущая линия
         return: новая линия, из начальных координат предыдущей и конечных координат текущей
@@ -501,7 +570,7 @@ class RoomContour:
         '''
         Создает петлю кривых контура дверного проема, начинающегося из короткой линии, обозначающую толщину проема
         is_right: bool направления создания до этого линии из центра проема (True - вправо, False - влево)
-        door: целевая дверь, у которой будет взят вектор направления для построения линий
+        door_normal: нормаль двери для нахождения вектора направления вдоль дверного проема
         door_width: ширина дверного проема
         short_line: короткая линия, обозначающая толщину проема и построенная по грани стены внутри дверного проема
         return: петля кривых (CurveLoop()) дверного проема в форме прямоугольника
@@ -536,6 +605,13 @@ class RoomContour:
         return res_curve_loop
 
     def get_boundary_point_from_room_in_door_center(self, door, room_solid):
+        '''
+        Находит точку, находящуюся на грани ограничивающего контура помещения в плоскости центра дверного проема
+        door: целевая дверь
+        room_solid: Solid помещения, у которого будет выполнен поиск точки на ограничивающем контуре, ближайшем к центру
+        дверного проема
+        return: точка, полученная при пересечении линии, запущенной из центра дверного проема и Solid помещения
+        '''
         line, is_right = self.create_line_from_door(door, "top")
         intersect_opt_inside = SolidCurveIntersectionOptions()
         intersect_opt_outside = SolidCurveIntersectionOptions()
@@ -564,6 +640,14 @@ class RoomContour:
         return distance
 
     def get_door_thickness_line(self, door, wall_solid, intersect_coord, is_right):
+        '''
+        Возвращает линию, равной толщине дверного проема для указанной двери, расположенную на грани стены
+        door: целевая дверь
+        wall_solid: Solid стен, присоединенных к стене-основе двери, включая саму основу-стену
+        intersect_coord: точка пересечения линии, запущенной из центра дверного проема вправо/влево и Solid стен
+        is_right: bool направления создания до этого линии из центра проема (True - вправо, False - влево)
+        return: линия, расположенная на грани дверного проема (справа или слева), равная толщине этого проема
+        '''
         # Создание линии, перпендикулярной линии, полученной из результата первого пересечения с линией вправо/влево
         line = self.create_line_from_xyz(door, intersect_coord, is_right)
 
@@ -579,16 +663,32 @@ class RoomContour:
         return line_of_door_thickness
 
     def get_start_point_for_door_contour(self, line_of_door_thickness, boundary_point_in_door_center):
+        '''
+        Находит стартовую точку для построения контура дверного проема
+        line_of_door_thickness: линия, лежащая на грани стены справа/слева от проема, с длиной, равной толщине проема
+        boundary_point_in_door_center: точка, лежащая на грани ограничивающего контура помещения в плоскости центра
+        дверного проема
+        return: стартовая точка для построения контура проема
+        '''
         points = []
         check_start_point = line_of_door_thickness.GetEndPoint(0)
         points.append(check_start_point)
         check_end_point = line_of_door_thickness.GetEndPoint(1)
         points.append(check_end_point)
         start_point = self.closest_point_to_target(boundary_point_in_door_center, points)
-        distance = convert_from_value(self.get_distance_from_two_points(check_start_point, check_end_point))
-        if start_point == check_end_point:
+        return start_point
+
+    def check_line_of_door_thickness(self, line_of_door_thickness, start_point):
+        '''
+        Возвращает отзеркаленную линию толщины проема, если это необходимо, в ином случае - возвращает ту же самую линию
+        line_of_door_thickness: линия, лежащая на грани стены справа/слева от проема, с длиной, равной толщине проема
+        start_point: стартовая точка для построения контура дверного проема
+        return: линия толщины проема
+        '''
+        check_end_point = line_of_door_thickness.GetEndPoint(1)
+        if start_point.X == check_end_point.X and start_point.Y == check_end_point.Y and start_point.Z == check_end_point.Z:
             line_of_door_thickness = line_of_door_thickness.CreateReversed()
-        return start_point, line_of_door_thickness, distance
+        return line_of_door_thickness
 
     def get_half_line_from_line_of_door_thickness(self, start_point, line_of_door_thickness,
                                                   distance,
@@ -602,10 +702,11 @@ class RoomContour:
         return line_of_door_thickness
 
     def get_specified_line(self, start_point, distance_from_user, line_of_door_thickness):
-        if 1 < float(distance_from_user) < convert_from_value(line_of_door_thickness.Length):
-            percents = int(distance_from_user) / convert_from_value(line_of_door_thickness.Length)
-            end_point = line_of_door_thickness.Evaluate(percents, True)
-            line_of_door_thickness = Line.CreateBound(start_point, end_point)
+        if 1 < float(distance_from_user) <= convert_from_value(line_of_door_thickness.Length):
+            direction = line_of_door_thickness.Direction
+            line_of_door_thickness = Line.CreateBound(start_point,
+                                                      start_point + direction * convert_to_value(distance_from_user))
+            line_for_check(line_of_door_thickness)
             return line_of_door_thickness
 
     def get_door_curve_loop(self, door, mode=1, distance_from_user=0):
@@ -657,8 +758,9 @@ class RoomContour:
 
         door_vector = self.get_vector_from_door(door)
 
-        start_point, line_of_door_thickness, distance = self.get_start_point_for_door_contour(line_of_door_thickness,
-                                                                                              boundary_point_in_door_center)
+        start_point = self.get_start_point_for_door_contour(line_of_door_thickness, boundary_point_in_door_center)
+        distance = convert_from_value(line_of_door_thickness.Length)
+        line_of_door_thickness = self.check_line_of_door_thickness(line_of_door_thickness, start_point)
 
         if mode == 2:
             line_of_door_thickness = self.get_half_line_from_line_of_door_thickness(start_point, line_of_door_thickness,
@@ -671,15 +773,6 @@ class RoomContour:
         door_curve_loop = self.create_rectangle_door_curve_loop(is_right, door_vector, door_width,
                                                                 line_of_door_thickness)
         return door_curve_loop
-
-    # def get_boundary_curve_from_room(self, curve_loops):
-    #     max_length = 0
-    #     boundary_curve = curve_loops[0]
-    #     for curve_loop in curve_loops:
-    #         current_length = curve_loop.GetExactLength
-    #         if current_length > max_length:
-    #             max_length = current_length
-    #     return boundary_curve
 
     def get_z_from_curve_loops(self, curve_loops):
         for curve_loop in curve_loops:
@@ -1064,6 +1157,10 @@ def script_execute(plugin_logger):
     main_window.show_dialog()
     if not main_window.DialogResult:
         script.exit()
+    # doors = revit_info.all_doors_on_active_view
+    # with revit.Transaction("TEST"):
+    #     for door in doors:
+    #         door_with_points = DoorWithPoints(door)
 
 
 script_execute()
