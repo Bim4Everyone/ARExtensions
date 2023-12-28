@@ -146,6 +146,7 @@ class RevitRepository:
         self.__room_parameters = self.__get_room_parameters()
         self.__selected_rooms = self.__get_selected_rooms()
         self.__doors_on_active_view = self.__get_doors_on_active_view()
+        self.__phase = self.__get_phase_on_active_view()
 
     @reactive
     def floor_types(self):
@@ -233,6 +234,14 @@ class RevitRepository:
         elements = elements_to_list(doors)
         return elements
 
+    @reactive
+    def phase(self):
+        return self.__phase
+
+    def __get_phase_on_active_view(self):
+        phase = doc.GetElement(active_view.get_Parameter(BuiltInParameter.VIEW_PHASE).AsElementId())
+        return phase
+
 
 class RoomContour:
     def __init__(self, room):
@@ -305,7 +314,7 @@ class RoomContour:
             curve_array.Append(curve)
         return curve_array
 
-    def get_curve_arrays_with_doors(self, mode=1, distance_from_user=0):
+    def get_curve_arrays_with_doors(self, mode=1, level_offset=0, distance_from_user=0):
         '''
         Возвращает самый длинный массив кривых (ограничивающий контур) из границ помещения, а также список массивов
         кривых, если они есть внутри помещения (для Revit 2020-2021) с дверными проемами для построения отверстий
@@ -317,7 +326,7 @@ class RoomContour:
         return: Ограничивающий контур помещения, список из кривых для построения отверстий внутри перекрытия
         '''
 
-        new_curve_loops = self.get_curve_loops_with_doors(mode, distance_from_user)
+        new_curve_loops = self.get_curve_loops_with_doors(mode, level_offset, distance_from_user)
         new_curve_loops = sorted(new_curve_loops, key=lambda x: x.GetExactLength(), reverse=True)
 
         boundary_curve_array = self.curve_loop_into_curve_array(new_curve_loops[0])
@@ -428,7 +437,7 @@ class RoomContour:
     #     return list_doors
     def get_doors_from_room(self):
         '''
-        Возвращает список всех дверей, которые пересекают виртуальный Solid помещения
+        Возвращает список всех дверей, смещенные точки которых находятся внутри помещения
         '''
         all_doors = self.revit_info.all_doors_on_active_view
         doors = []
@@ -709,15 +718,31 @@ class RoomContour:
             line_for_check(line_of_door_thickness)
             return line_of_door_thickness
 
-    def get_door_curve_loop(self, door, mode=1, distance_from_user=0):
+    def check_for_create_door_contour(self, door, level_offset=0):
+
+        door_location = self.get_door_location(door)
+        room_z_point = doc.GetElement(self.room.LevelId).Elevation + convert_to_value(level_offset)
+        res = True
+        phase = self.revit_info.phase
+        if door_location[2] != room_z_point or not door.FromRoom[phase]:
+            res = False
+        return res
+
+    def get_door_curve_loop(self, door, mode=1, level_offset=0, distance_from_user=0):
         '''
         Возвращает петлю кривых дверного проема, полученную из пересечения с линией, созданной из центра дверного проема
         вправо/влево
         door: целевая дверь, по габаритам которой будет создана петля кривых (CurveLoop())
         return: петля кривых (CurveLoop()) дверного проема в форме прямоугольника
         '''
+        # Проверка для возможности создания контура дверного проема (направление двери, ее высота, относительно
+        # перекрытия)
+
+        if not self.check_for_create_door_contour(door, level_offset):
+            return
         # Создание линии из центра дверного проема вправо
-        first_line, is_right = self.create_line_from_door(door)
+        first_line, is_right = self.create_line_from_door(door, "right")
+
         # Формирование виртуального Solid из всех стен (включая стену-основу), присоединенных к основе стены дверного
         # проема
         wall_solid = self.get_solid_from_host_walls(door)
@@ -811,7 +836,7 @@ class RoomContour:
             if face.FaceNormal[2] == -1:
                 return face.GetEdgesAsCurveLoops()
 
-    def get_curve_loops_with_doors(self, mode=1, distance_from_user=0):
+    def get_curve_loops_with_doors(self, mode=1, level_offset=0, distance_from_user=0):
         '''
         Создает новую петлю кривых (CurveLoop()) помещения с дверными проемами
         '''
@@ -823,7 +848,7 @@ class RoomContour:
             z = self.get_z_from_curve_loops(room_curve_loops)
             for door in doors:
                 try:
-                    door_curve_loop = self.get_door_curve_loop(door, mode, distance_from_user)
+                    door_curve_loop = self.get_door_curve_loop(door, mode, level_offset, distance_from_user)
                     door_curve_loop = self.create_curve_loop_equal_to_Z(z, door_curve_loop)
                     door_solid = GeometryCreationUtilities.CreateExtrusionGeometry([door_curve_loop], XYZ(0, 0, 1), 1)
 
@@ -849,7 +874,7 @@ class CreateFloorsByRooms:
         '''
         if HOST_APP.is_older_than(2022):
             if mode > 0:
-                curve_array = RoomContour(room).get_curve_arrays_with_doors(mode, distance_from_user)[0]
+                curve_array = RoomContour(room).get_curve_arrays_with_doors(mode, level_offset, distance_from_user)[0]
             else:
                 curve_array = RoomContour(room).get_curve_arrays_of_room()[0]
             level = doc.GetElement(room.LevelId)
@@ -857,7 +882,7 @@ class CreateFloorsByRooms:
 
         else:
             if mode > 0:
-                curve_loops = RoomContour(room).get_curve_loops_with_doors(mode, distance_from_user)
+                curve_loops = RoomContour(room).get_curve_loops_with_doors(mode, level_offset, distance_from_user)
             else:
                 curve_loops = RoomContour(room).get_curve_loops_of_room()
             level_id = room.LevelId
@@ -1159,8 +1184,9 @@ def script_execute(plugin_logger):
         script.exit()
     # doors = revit_info.all_doors_on_active_view
     # with revit.Transaction("TEST"):
+    #     phase = revit_info.phase
     #     for door in doors:
-    #         door_with_points = DoorWithPoints(door)
+    #         print(door.FromRoom[phase])
 
 
 script_execute()
