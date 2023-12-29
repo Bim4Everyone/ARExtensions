@@ -7,7 +7,7 @@
         Title="Отделка пола"
         mc:Ignorable="d"
         WindowStartupLocation="CenterScreen"
-        Height="300" Width="600"
+        Height="360" Width="600"
         ResizeMode="NoResize">
     <Grid>
         <Grid.RowDefinitions>
@@ -20,6 +20,7 @@
 
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
@@ -46,6 +47,11 @@
                     VerticalContentAlignment="Center"
                     ItemsSource="{Binding doors_contours_options}"
                     SelectedItem="{Binding selected_door_contour_option}"/>
+                <TextBlock Grid.Row="3" Grid.Column="0"
+                        VerticalAlignment="Center"
+                           Margin="5 0 0 0 "
+                        Text="При заведении пола в дверные проемы на всю толщину стены заводить, если:"
+                        TextWrapping="Wrap"/>
                 <ComboBox
                     Grid.Row="0" Grid.Column="1"
                     Margin="5 10"
@@ -66,6 +72,12 @@
                     Margin="5 10"
                     IsEnabled="{Binding is_enabled_door_contour_offset, FallbackValue=is_enabled_door_contour_offset, UpdateSourceTrigger=PropertyChanged}"
                     Text="{Binding door_contour_offset, FallbackValue=door_contour_offset, UpdateSourceTrigger=PropertyChanged}"/>
+                <ComboBox
+                    Grid.Row="3" Grid.Column="1"
+                    Margin="5 10"
+                    VerticalContentAlignment="Center"
+                    ItemsSource="{Binding door_openings}"
+                    SelectedItem="{Binding selected_door_opening}"/>
             </Grid>
         </GroupBox>
         <Grid Grid.Row="1" >
@@ -107,8 +119,6 @@
                     Click="ButtonOk_Click">
                 </Button>
             </StackPanel>
-
-
         </Grid>
     </Grid>
 </Window>

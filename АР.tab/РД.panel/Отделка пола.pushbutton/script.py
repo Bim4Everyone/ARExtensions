@@ -718,13 +718,13 @@ class RoomContour:
             line_for_check(line_of_door_thickness)
             return line_of_door_thickness
 
-    def check_for_create_door_contour(self, door, level_offset=0):
+    def check_for_create_door_contour(self, door, mode=1, level_offset=0):
 
         door_location = self.get_door_location(door)
         room_z_point = doc.GetElement(self.room.LevelId).Elevation + convert_to_value(level_offset)
         res = True
         phase = self.revit_info.phase
-        if door_location[2] != room_z_point or not door.FromRoom[phase]:
+        if mode == 1 and (door_location[2] != room_z_point or not door.FromRoom[phase]):
             res = False
         return res
 
@@ -738,7 +738,7 @@ class RoomContour:
         # Проверка для возможности создания контура дверного проема (направление двери, ее высота, относительно
         # перекрытия)
 
-        if not self.check_for_create_door_contour(door, level_offset):
+        if not self.check_for_create_door_contour(door, mode, level_offset):
             return
         # Создание линии из центра дверного проема вправо
         first_line, is_right = self.create_line_from_door(door, "right")
@@ -1044,6 +1044,8 @@ class MainWindowViewModel(Reactive):
         self.__selected_door_contour_option = self.doors_contours_options[0]
         self.__door_contour_offset = "0"
         self.__is_enabled_door_contour_offset = False
+        self.__door_openings = ["Открывание в любую сторону", "Открывание наружу", "Открывание внутрь"]
+        self.__selected_door_opening = self.door_openings[0]
 
     @reactive
     def floor_types(self):
@@ -1054,8 +1056,12 @@ class MainWindowViewModel(Reactive):
         return self.__rooms_on_active_view
 
     @reactive
-    def selected_floor_type(self):
-        return self.__selected_floor_type
+    def selected_door_opening(self):
+        return self.__selected_door_opening
+
+    @selected_door_opening.setter
+    def selected_door_opening(self, value):
+        self.__selected_door_opening = value
 
     @property
     def create_floors_by_rooms(self):
@@ -1158,6 +1164,10 @@ class MainWindowViewModel(Reactive):
         if not value:
             self.door_contour_offset = "0"
         self.__is_enabled_door_contour_offset = value
+
+    @reactive
+    def door_openings(self):
+        return self.__door_openings
 
 
 @notification()
