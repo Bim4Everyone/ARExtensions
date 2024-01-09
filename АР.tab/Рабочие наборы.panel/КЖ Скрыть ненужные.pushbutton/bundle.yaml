@@ -5,8 +5,10 @@ title:
     KJ Hide unwanted
 
 tooltip:
-  ru: Закрывает рабочие наборы из связей КР, в которых есть арматура.
-  en_us: Close worksets with reinforcement from KR links with reinforcement.
+  ru: Закрывает рабочие наборы из связей КР, в которых находятся арматура и вспомогательные элементы.
+  en_us: Closes worksets with reinforcement and additional elements from KR links.
+
+context: doc-project
 
 author: vlastroG
 help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=116067966"
