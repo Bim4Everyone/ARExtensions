@@ -6,6 +6,7 @@ from pyrevit import EXEC_PARAMS
 
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI import *
+from Autodesk.Revit.Exceptions import *
 
 from dosymep_libs.bim4everyone import log_plugin
 from dosymep_libs.simple_services import notification
@@ -37,17 +38,19 @@ def script_execute(plugin_logger):
             worksets_to_open = list(filter(lambda workset: not (workset.Name.startswith("КЖ")
                                                                 or "29_Скрытые элементы" == workset.Name
                                                                 or "28_Конструкции_Вспомогательные" == workset.Name
-                                                                or "20_КР_КЖ_Скрыть" == workset.Name), worksets))
+                                                                or "20_КР_КЖ_Скрыть" == workset.Name
+                                                                or "27_Конструкции_Вспомогательные" == workset.Name
+                                                                ), worksets))
             workset_ids_to_open = list(map(lambda workset: workset.Id, worksets_to_open))
             workset_configuration = WorksetConfiguration(WorksetConfigurationOption.CloseAllWorksets)
             workset_configuration.Open(workset_ids_to_open)
             try:
                 link_type.LoadFrom(model_path, workset_configuration)
-            except (Autodesk.Revit.Exceptions.ArgumentException,
-                    Autodesk.Revit.Exceptions.FileAccessException,
-                    Autodesk.Revit.Exceptions.ForbiddenForDynamicUpdateException,
-                    Autodesk.Revit.Exceptions.InvalidOperationException):
-                errors.append(Element.Name.GetValue(link_type))
+            except (ArgumentException,
+                    FileAccessException,
+                    ForbiddenForDynamicUpdateException,
+                    InvalidOperationException) as error:
+                errors.append(Element.Name.GetValue(link_type) + "\n-->" + error.Message)
     if errors:
         errors.insert(0, "Следующие связи не обработаны:")
         forms.alert("\n".join(errors), exitscript=True)
