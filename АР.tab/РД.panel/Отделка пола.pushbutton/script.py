@@ -64,17 +64,23 @@ def line_for_check(line):
         doc.Create.NewDetailCurve(active_view, line)
 
 
-def door_contour_options():
-    dict = {0: "Не заводить контур пола в дверные проемы",
-            1: "Заводить контур на всю толщины стены",
-            2: "Заводить контур до середины стены",
-            3: "Заводить контур на указанное значение, мм"}
-    return dict
+def door_contour_option():
+    dict_of_contour_option = {0: "Не заводить контур пола в дверные проемы",
+                              1: "Заводить контур на всю толщину стены",
+                              2: "Заводить контур до середины стены",
+                              3: "Заводить контур на указанное значение, мм"}
+    return dict_of_contour_option
 
 
-def selected_index_of_dict(value):
-    door_options = door_contour_options()
-    for k, v in door_options.items():
+def door_opening_option_dict():
+    dict_of_opening_option = {0: "Открывание в любую сторону",
+                              1: "Открывание наружу",
+                              2: "Открывание внутрь"}
+    return dict_of_opening_option
+
+
+def selected_index_of_dict(door_option_dict, value):
+    for k, v in door_option_dict.items():
         if value == v:
             return k
     return 0
@@ -205,6 +211,9 @@ class RevitRepository:
         return self.__room_parameters
 
     def __get_room_parameters(self):
+        '''
+        Функция возвращает список параметров помещения
+        '''
         room_filter = RoomFilter()
         room = FilteredElementCollector(doc) \
             .WherePasses(room_filter) \
@@ -219,6 +228,9 @@ class RevitRepository:
         return self.__selected_rooms
 
     def __get_selected_rooms(self):
+        '''
+        Функция возвращает список помещений, выбранных пользователем до запуска скрипта
+        '''
         selected_element_ids = uidoc.Selection.GetElementIds()
         elements = [doc.GetElement(el) for el in selected_element_ids if
                     isinstance(doc.GetElement(el), Room) and doc.GetElement(el).Area > 0]
@@ -314,7 +326,7 @@ class RoomContour:
             curve_array.Append(curve)
         return curve_array
 
-    def get_curve_arrays_with_doors(self, mode=1, level_offset=0, distance_from_user=0):
+    def get_curve_arrays_with_doors(self, mode=1, level_offset=0, distance_from_user=0, door_opening_option=0):
         '''
         Возвращает самый длинный массив кривых (ограничивающий контур) из границ помещения, а также список массивов
         кривых, если они есть внутри помещения (для Revit 2020-2021) с дверными проемами для построения отверстий
@@ -322,11 +334,13 @@ class RoomContour:
         mode: режим, выбранный пользователем при создании перекрытия (0 - без заведения перекрытия в дверные проемы
         1 - с заведением перекрытия в дверные проемы на всю толщину, 2 - с заведением перекрытия в дверные проемы
         до середины толщины, 3 - с заведением перекрытия в дверные проемы на указанную длину в пределах толщины, в мм)
+        level_offset: смещение перекрытия по высоте, вводимое пользователем
         distance_from_user: указанная длина, на которую нужно завести перекрытие в дверной проем, если выбран mode = 3
-        return: Ограничивающий контур помещения, список из кривых для построения отверстий внутри перекрытия
+        door_opening_option: опция открывания дверей при заведении на всю толщину (в любую сторону, наружу, внутрь из
+        помещения)
+        return: Ограничивающий контур помещения; список из кривых для построения отверстий внутри перекрытия
         '''
-
-        new_curve_loops = self.get_curve_loops_with_doors(mode, level_offset, distance_from_user)
+        new_curve_loops = self.get_curve_loops_with_doors(mode, level_offset, distance_from_user, door_opening_option)
         new_curve_loops = sorted(new_curve_loops, key=lambda x: x.GetExactLength(), reverse=True)
 
         boundary_curve_array = self.curve_loop_into_curve_array(new_curve_loops[0])
@@ -422,19 +436,6 @@ class RoomContour:
         virtual_solid = GeometryCreationUtilities.CreateExtrusionGeometry(new_curve_loops, XYZ(0, 0, 1), 10)
         return virtual_solid
 
-    # def get_doors_from_room(self):
-    #     '''
-    #     Возвращает список всех дверей, которые пересекают виртуальный Solid помещения
-    #     '''
-    #     virtual_solid = self.create_virtual_solid_of_room(10)
-    #
-    #     intersect_filter = ElementIntersectsSolidFilter(virtual_solid)
-    #     doors = (FilteredElementCollector(doc, active_view.Id)
-    #              .WhereElementIsNotElementType()
-    #              .OfCategory(BuiltInCategory.OST_Doors)
-    #              .WherePasses(intersect_filter))
-    #     list_doors = elements_to_list(doors)
-    #     return list_doors
     def get_doors_from_room(self):
         '''
         Возвращает список всех дверей, смещенные точки которых находятся внутри помещения
@@ -469,8 +470,8 @@ class RoomContour:
 
     def get_solid_from_host_walls(self, door):
         '''
-        Возвращает объединенный Solid из стен, которые присоединены к основе стены двери
-        door: дверь, из которой будет взята основа-стена
+        Возвращает объединенный Solid из стен, которые присоединены к основе стены двери.
+        door: дверь, из которой будет взята основа-стена.
         return: объединенный Solid из стен, которые присоединены к основе-стене двери
         '''
         opt = Options()
@@ -533,7 +534,7 @@ class RoomContour:
     def create_line_from_xyz(self, door, point, is_right=True):
         '''
         Создает линию, перпендикулярную ширине проема, из указанной точки, равной константе, в мм
-        door: целевая дверь, у которой будет взят вектор направления
+        door: целевая дверь, у которой будет взят вектор направления.
         point: точка, которая будет являться центром создаваемой линии
         is_right: bool направления создания до этого линии из центра проема (True - вправо, False - влево)
         return: линия, созданная перпендикулярно ширине проема
@@ -718,27 +719,49 @@ class RoomContour:
             line_for_check(line_of_door_thickness)
             return line_of_door_thickness
 
-    def check_for_create_door_contour(self, door, mode=1, level_offset=0):
-
-        door_location = self.get_door_location(door)
-        room_z_point = doc.GetElement(self.room.LevelId).Elevation + convert_to_value(level_offset)
+    def check_for_create_door_contour(self, door, mode=1, level_offset=0, door_opening_option=0):
+        '''
+        Данная функция проверяет, нужно ли заводить контур в дверной проем или нет
+        door: дверь, которая будет проверяться
+        mode: режим, выбранный пользователем при создании перекрытия (0 - без заведения перекрытия в дверные проемы
+        1 - с заведением перекрытия в дверные проемы на всю толщину, 2 - с заведением перекрытия в дверные проемы
+        до середины толщины, 3 - с заведением перекрытия в дверные проемы на указанную длину в пределах толщины, в мм)
+        level_offset: смещение перекрытия по высоте, вводимое пользователем
+        door_opening_option: опция открывания дверей при заведении на всю толщину (в любую сторону, наружу, внутрь из
+        помещения)
+        '''
+        door_location_z = int(self.get_door_location(door).Z)
+        room_z_point = int(doc.GetElement(self.room.LevelId).Elevation) + convert_to_value(level_offset)
         res = True
         phase = self.revit_info.phase
-        if mode == 1 and (door_location[2] != room_z_point or not door.FromRoom[phase]):
+        room_id = self.room.Id
+        if mode > 0 and (door_location_z != room_z_point):
             res = False
+        if mode == 1 and door_opening_option > 0:
+            if door_opening_option == 1 and door.FromRoom[phase].Id != room_id:
+                res = False
+            elif door_opening_option == 2 and door.FromRoom[phase].Id == room_id:
+                res = False
+
         return res
 
-    def get_door_curve_loop(self, door, mode=1, level_offset=0, distance_from_user=0):
+    def get_door_curve_loop(self, door, mode=1, level_offset=0, distance_from_user=0, door_opening_option=0):
         '''
         Возвращает петлю кривых дверного проема, полученную из пересечения с линией, созданной из центра дверного проема
         вправо/влево
-        door: целевая дверь, по габаритам которой будет создана петля кривых (CurveLoop())
+        door: целевая дверь, по габаритам которой будет создана петля кривых (CurveLoop()).
+        mode: режим, выбранный пользователем при создании перекрытия (0 - без заведения перекрытия в дверные проемы
+        1 - с заведением перекрытия в дверные проемы на всю толщину, 2 - с заведением перекрытия в дверные проемы
+        до середины толщины, 3 - с заведением перекрытия в дверные проемы на указанную длину в пределах толщины, в мм)
+        level_offset: смещение перекрытия по высоте, вводимое пользователем
+        distance_from_user: указанная длина, на которую нужно завести перекрытие в дверной проем, если выбран mode = 3
+        door_opening_option: опция открывания дверей при заведении на всю толщину (в любую сторону, наружу, внутрь из
+        помещения)
         return: петля кривых (CurveLoop()) дверного проема в форме прямоугольника
         '''
         # Проверка для возможности создания контура дверного проема (направление двери, ее высота, относительно
         # перекрытия)
-
-        if not self.check_for_create_door_contour(door, mode, level_offset):
+        if not self.check_for_create_door_contour(door, mode, level_offset, door_opening_option):
             return
         # Создание линии из центра дверного проема вправо
         first_line, is_right = self.create_line_from_door(door, "right")
@@ -807,7 +830,7 @@ class RoomContour:
     def create_curve_loop_equal_to_Z(self, z, old_curve_loop):
         '''
         Создание новой петли кривых (CurveLoop()) из старой, но выравненных по z координате
-        z: координата z, по которой нужно выровнять кривые
+        z: координата z, по которой нужно выровнять кривые.
         curve_list: старая петля кривых (CurveLoop()), которую нужно выровнять по z
         return: новая петля кривых, выровненная по z координате
         '''
@@ -836,9 +859,17 @@ class RoomContour:
             if face.FaceNormal[2] == -1:
                 return face.GetEdgesAsCurveLoops()
 
-    def get_curve_loops_with_doors(self, mode=1, level_offset=0, distance_from_user=0):
+    def get_curve_loops_with_doors(self, mode=1, level_offset=0, distance_from_user=0, door_opening_option=0):
         '''
         Создает новую петлю кривых (CurveLoop()) помещения с дверными проемами
+        mode: режим, выбранный пользователем при создании перекрытия (0 - без заведения перекрытия в дверные проемы
+        1 - с заведением перекрытия в дверные проемы на всю толщину, 2 - с заведением перекрытия в дверные проемы
+        до середины толщины, 3 - с заведением перекрытия в дверные проемы на указанную длину в пределах толщины, в мм)
+        level_offset: смещение перекрытия по высоте, вводимое пользователем
+        distance_from_user: указанная длина, на которую нужно завести перекрытие в дверной проем, если выбран mode = 3
+        door_opening_option: опция открывания дверей при заведении на всю толщину (в любую сторону, наружу, внутрь из
+        помещения)
+        return: Возвращает новую петлю кривых с контурами дверных проемов
         '''
 
         room_curve_loops = self.get_curve_loops_of_room()
@@ -848,7 +879,8 @@ class RoomContour:
             z = self.get_z_from_curve_loops(room_curve_loops)
             for door in doors:
                 try:
-                    door_curve_loop = self.get_door_curve_loop(door, mode, level_offset, distance_from_user)
+                    door_curve_loop = self.get_door_curve_loop(door, mode, level_offset, distance_from_user,
+                                                               door_opening_option)
                     door_curve_loop = self.create_curve_loop_equal_to_Z(z, door_curve_loop)
                     door_solid = GeometryCreationUtilities.CreateExtrusionGeometry([door_curve_loop], XYZ(0, 0, 1), 1)
 
@@ -864,17 +896,25 @@ class RoomContour:
 
 class CreateFloorsByRooms:
 
-    def floor_create(self, room, floor_type, mode, distance_from_user=0, level_offset=0):
+    def floor_create(self, room, floor_type, mode, distance_from_user=0, level_offset=0, door_opening_option=0):
         '''
         Создает перекрытие на основе CurveLoop помещения и его уровня, заданным типоразмером перекрытия со смещением
         от уровня (опционально)
         room: помещение, на основе которого будет создано перекрытие
         floor_type: типоразмер перекрытия, который будет указан для создания
-        level_offset: смещение от уровня (по умолчанию 0)
+        mode: режим, выбранный пользователем при создании перекрытия (0 - без заведения перекрытия в дверные проемы
+        1 - с заведением перекрытия в дверные проемы на всю толщину, 2 - с заведением перекрытия в дверные проемы
+        до середины толщины, 3 - с заведением перекрытия в дверные проемы на указанную длину в пределах толщины, в мм)
+        distance_from_user: указанная длина, на которую нужно завести перекрытие в дверной проем, если выбран mode = 3
+        level_offset: смещение перекрытия по высоте, вводимое пользователем
+        door_opening_option: опция открывания дверей при заведении на всю толщину (в любую сторону, наружу, внутрь из
+        помещения)
+        return: текущее созданное перекрытие
         '''
         if HOST_APP.is_older_than(2022):
             if mode > 0:
-                curve_array = RoomContour(room).get_curve_arrays_with_doors(mode, level_offset, distance_from_user)[0]
+                curve_array = RoomContour(room).get_curve_arrays_with_doors(mode, level_offset, distance_from_user,
+                                                                            door_opening_option)[0]
             else:
                 curve_array = RoomContour(room).get_curve_arrays_of_room()[0]
             level = doc.GetElement(room.LevelId)
@@ -882,7 +922,8 @@ class CreateFloorsByRooms:
 
         else:
             if mode > 0:
-                curve_loops = RoomContour(room).get_curve_loops_with_doors(mode, level_offset, distance_from_user)
+                curve_loops = RoomContour(room).get_curve_loops_with_doors(mode, level_offset, distance_from_user,
+                                                                           door_opening_option)
             else:
                 curve_loops = RoomContour(room).get_curve_loops_of_room()
             level_id = room.LevelId
@@ -901,19 +942,29 @@ class CreateFloorsByRooms:
             for curve in curves:
                 doc.Create.NewOpening(floor, curve, True)
 
-    def create_floors_by_rooms_on_view(self, rooms, floor_type, mode, distance_from_user=0, level_offset=0):
+    def create_floors_by_rooms_on_view(self, rooms, floor_type, mode, distance_from_user=0, level_offset=0,
+                                       door_opening_option=0):
         '''
         Создает перекрытия последовательно по помещениям в выборке, используя функцию создания перекрытия по помещению
         Для Revit версии 2021 и старше создаются вырезания в перекрытии отдельной транзакцией, если контур помещения
         состоит из нескольких окружающих кривых
+        rooms: список помещений, по контуру которых необходимо создать пол
         floor_type: типоразмер перекрытия, который будет указан для создания
+        mode: режим, выбранный пользователем при создании перекрытия (0 - без заведения перекрытия в дверные проемы
+        1 - с заведением перекрытия в дверные проемы на всю толщину, 2 - с заведением перекрытия в дверные проемы
+        до середины толщины, 3 - с заведением перекрытия в дверные проемы на указанную длину в пределах толщины, в мм)
+        distance_from_user: указанная длина, на которую нужно завести перекрытие в дверной проем, если выбран mode = 3
+        level_offset: смещение перекрытия по высоте, вводимое пользователем
+        door_opening_option: опция открывания дверей при заведении на всю толщину (в любую сторону, наружу, внутрь из
+        помещения)
         level_offset: смещение от уровня (по умолчанию 0)
         '''
         if HOST_APP.is_older_than(2022):
             with revit.Transaction("BIM: Создание перекрытий"):
                 rooms_and_floors_dict = {}
                 for room in rooms:
-                    floor = self.floor_create(room, floor_type, mode, distance_from_user, level_offset)
+                    floor = self.floor_create(room, floor_type, mode, distance_from_user, level_offset,
+                                              door_opening_option)
                     rooms_and_floors_dict[room] = floor
 
             with revit.Transaction("BIM: Создание отверстий в перекрытии"):
@@ -928,7 +979,7 @@ class CreateFloorsByRooms:
                 error_ids = []
                 for room in rooms:
                     try:
-                        self.floor_create(room, floor_type, mode, distance_from_user, level_offset)
+                        self.floor_create(room, floor_type, mode, distance_from_user, level_offset, door_opening_option)
                     except:
                         error_ids.append(room.Id)
             if len(error_ids) > 0:
@@ -970,14 +1021,17 @@ class CreateFloorsByRoomsCommand(ICommand):
     def Execute(self, parameter):
         if self.__view_model.is_checked_selected:
             # Если пользователь выбрал создать перекрытия по предварительно выбранным помещениям
-
             self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.selected_rooms,
                                                                         self.__view_model.selected_floor_type,
-                                                                        selected_index_of_dict(
-                                                                            self.__view_model
-                                                                            .selected_door_contour_option),
+                                                                        selected_index_of_dict(door_contour_option(),
+                                                                                               self.__view_model
+                                                                                               .selected_door_contour_option),
                                                                         self.__view_model.door_contour_offset,
-                                                                        self.__view_model.level_offset)
+                                                                        self.__view_model.level_offset,
+                                                                        selected_index_of_dict(
+                                                                            door_opening_option_dict(),
+                                                                            self.__view_model
+                                                                            .selected_door_opening))
 
         elif self.__view_model.is_checked_select:
             # Если пользователь выбрал создать перекрытия по выбранным помещениям
@@ -985,22 +1039,30 @@ class CreateFloorsByRoomsCommand(ICommand):
             select_rooms = self.__revit_repository.select_rooms_on_view("Выберите помещения")
             self.__create_floors_by_view.create_floors_by_rooms_on_view(select_rooms,
                                                                         self.__view_model.selected_floor_type,
-                                                                        selected_index_of_dict(
-                                                                            self.__view_model
-                                                                            .selected_door_contour_option),
+                                                                        selected_index_of_dict(door_contour_option(),
+                                                                                               self.__view_model
+                                                                                               .selected_door_contour_option),
                                                                         self.__view_model.door_contour_offset,
-                                                                        self.__view_model.level_offset)
+                                                                        self.__view_model.level_offset,
+                                                                        selected_index_of_dict(
+                                                                            door_opening_option_dict(),
+                                                                            self.__view_model
+                                                                            .selected_door_opening))
 
         elif self.__view_model.is_checked_on_view:
             # Если пользователь выбрал создать перекрытия на активном виде
 
             self.__create_floors_by_view.create_floors_by_rooms_on_view(self.__view_model.rooms_on_active_view,
                                                                         self.__view_model.selected_floor_type,
-                                                                        selected_index_of_dict(
-                                                                            self.__view_model
-                                                                            .selected_door_contour_option),
+                                                                        selected_index_of_dict(door_contour_option(),
+                                                                                               self.__view_model
+                                                                                               .selected_door_contour_option),
                                                                         self.__view_model.door_contour_offset,
-                                                                        self.__view_model.level_offset)
+                                                                        self.__view_model.level_offset,
+                                                                        selected_index_of_dict(
+                                                                            door_opening_option_dict(),
+                                                                            self.__view_model
+                                                                            .selected_door_opening))
 
 
 class MainWindow(WPFWindow):
@@ -1040,11 +1102,11 @@ class MainWindowViewModel(Reactive):
         self.__room_parameters = revit_repository.room_parameters
         self.__error_text = ""
         self.__create_floors_by_rooms = CreateFloorsByRoomsCommand(self)
-        self.__doors_contours_options = door_contour_options().values()
+        self.__doors_contours_options = door_contour_option().values()
         self.__selected_door_contour_option = self.doors_contours_options[0]
         self.__door_contour_offset = "0"
         self.__is_enabled_door_contour_offset = False
-        self.__door_openings = ["Открывание в любую сторону", "Открывание наружу", "Открывание внутрь"]
+        self.__door_openings = door_opening_option_dict().values()
         self.__selected_door_opening = self.door_openings[0]
 
     @reactive
@@ -1192,11 +1254,6 @@ def script_execute(plugin_logger):
     main_window.show_dialog()
     if not main_window.DialogResult:
         script.exit()
-    # doors = revit_info.all_doors_on_active_view
-    # with revit.Transaction("TEST"):
-    #     phase = revit_info.phase
-    #     for door in doors:
-    #         print(door.FromRoom[phase])
 
 
 script_execute()
