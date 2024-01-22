@@ -1,0 +1,21 @@
+title:
+  ru: Отделка стен
+  en_us: Walls finishing
+
+tooltip:
+  ru: >- 
+    Создает отделочные стены по контурам выбранных на плане помещений
+  en_us: >- 
+    Creates finishing walls by room boundaries on active plan view
+
+assembly: RevitFinishingWalls.dll
+command_class: RevitFinishingWallsCommand
+
+context:
+  - doc-project
+  - active-floor-plan
+
+author: vlastroG
+
+min_revit_version: 2020
+max_revit_version: 2024
