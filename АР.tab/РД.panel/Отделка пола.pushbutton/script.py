@@ -15,6 +15,7 @@ from Autodesk.Revit.DB.Architecture import RoomFilter, Room
 from Autodesk.Revit.UI.Selection import ObjectType
 
 import dosymep
+import collections
 
 clr.ImportExtensions(dosymep.Revit)
 clr.ImportExtensions(dosymep.Bim4Everyone)
@@ -37,14 +38,14 @@ def elements_to_list(elements):
     return [el for el in elements]
 
 
-def convert_to_value(value):
+def convert_to_millimeters(value):
     if HOST_APP.is_older_than(2022):
         return UnitUtils.ConvertToInternalUnits(int(value), DisplayUnitType.DUT_MILLIMETERS)
     else:
         return UnitUtils.ConvertToInternalUnits(int(value), UnitTypeId.Millimeters)
 
 
-def convert_from_value(value):
+def convert_from_millimeters(value):
     if HOST_APP.is_older_than(2022):
         return UnitUtils.ConvertFromInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
     else:
@@ -57,11 +58,6 @@ def is_int(value):
         return True
     except:
         return False
-
-
-def line_for_check(line):
-    with revit.Transaction("Test line"):
-        doc.Create.NewDetailCurve(active_view, line)
 
 
 def door_contour_option():
@@ -86,50 +82,11 @@ def selected_index_of_dict(door_option_dict, value):
     return 0
 
 
-def show_error_message(ids):
-    ids_str = ", ".join(str(i) for i in ids)
-    forms.alert("Не удалось создать пол по контуру помещения:", "РЕЗУЛЬТАТ", ids_str)
-
-
-class DoorsWithPoints:
-    def __init__(self, doors):
-        self.doors = doors
-
-    def get_doors_from_room(self, room):
-        doors_in_room = []
-        for door in self.doors:
-            points = door.points
-            for point in points:
-                if room.IsPointInRoom(point):
-                    doors_in_room.append(door.revit_door)
-        return doors_in_room
-
-
-class DoorWithPoints:
-    def __init__(self, door):
-        self.door = door
-        self.__points = self.__create_two_points()
-
-    @reactive
-    def revit_door(self):
-        return self.door
-
-    @reactive
-    def points(self):
-        return self.__points
-
-    def __create_two_points(self):
-        '''
-        ДОПИСАТЬ
-        '''
-        door_location = RoomContour.get_door_location(self.door)
-        door_vector = RoomContour.get_vector_from_door(self.door)
-        z = convert_to_value(200) + door_location[2]
-        dist_const_top_bottom = convert_to_value(600)
-        top_point = XYZ(door_location[0], door_location[1], z) + door_vector * dist_const_top_bottom
-        bottom_point = XYZ(door_location[0], door_location[1], z) - door_vector * dist_const_top_bottom
-
-        return top_point, bottom_point
+def show_error_message(element_ids):
+    output = script.get_output()
+    output.insert_divider(level="Не удалось создать пол по контуру помещения:")
+    for idx, elid in enumerate(element_ids):
+        print('{}:{}'.format(idx + 1, output.linkify(elid)))
 
 
 class ClassISelectionFilter(ISelectionFilter):
@@ -145,35 +102,22 @@ class ClassISelectionFilter(ISelectionFilter):
 
 class RevitRepository:
     def __init__(self, doc):
-        self.doc = doc
-        self.__floor_types = self.__collect_floor_types()
-        self.__all_rooms = self.__collect_all_rooms()
-        self.__rooms_on_active_view = self.__collect_rooms_on_active_view()
-        self.__room_parameters = self.__get_room_parameters()
-        self.__selected_rooms = self.__get_selected_rooms()
-        self.__doors_on_active_view = self.__get_doors_on_active_view()
-        self.__phase = self.__get_phase_on_active_view()
+        self.__doc = doc
 
     @reactive
     def floor_types(self):
-        return self.__floor_types
-
-    def __collect_floor_types(self):
-        all_floor_types = FilteredElementCollector(doc) \
+        all_floor_types = FilteredElementCollector(self.__doc) \
             .WhereElementIsElementType() \
             .OfCategory(BuiltInCategory.OST_Floors)
         return elements_to_list(all_floor_types)
 
     @reactive
     def rooms_on_active_view(self):
-        return self.__rooms_on_active_view
-
-    def __collect_rooms_on_active_view(self):
         '''
         Функция возвращает размещенные помещения на активном виде, у которых значение параметра "Площадь" больше 0
         '''
         room_filter = RoomFilter()
-        all_rooms = FilteredElementCollector(doc, active_view.Id) \
+        all_rooms = FilteredElementCollector(self.__doc, active_view.Id) \
             .WherePasses(room_filter) \
             .ToElements()
         correct_rooms = [room for room in all_rooms if room.Area > 0]
@@ -181,14 +125,11 @@ class RevitRepository:
 
     @reactive
     def all_rooms(self):
-        return self.__all_rooms
-
-    def __collect_all_rooms(self):
         '''
         Функция возвращает размещенные помещения, у которых значение параметра "Площадь" больше 0
         '''
         room_filter = RoomFilter()
-        all_rooms = FilteredElementCollector(doc) \
+        all_rooms = FilteredElementCollector(self.__doc) \
             .WherePasses(room_filter) \
             .ToElements()
         correct_rooms = [room for room in all_rooms if
@@ -207,52 +148,139 @@ class RevitRepository:
             return elements
 
     @reactive
-    def room_parameters(self):
-        return self.__room_parameters
-
-    def __get_room_parameters(self):
-        '''
-        Функция возвращает список параметров помещения
-        '''
-        room_filter = RoomFilter()
-        room = FilteredElementCollector(doc) \
-            .WherePasses(room_filter) \
-            .FirstElement()
-        if room is not None:
-            parameters_list = [p.Definition.Name for p in room.Parameters]
-            return parameters_list
-        return
-
-    @reactive
     def selected_rooms(self):
-        return self.__selected_rooms
-
-    def __get_selected_rooms(self):
         '''
         Функция возвращает список помещений, выбранных пользователем до запуска скрипта
         '''
         selected_element_ids = uidoc.Selection.GetElementIds()
-        elements = [doc.GetElement(el) for el in selected_element_ids if
-                    isinstance(doc.GetElement(el), Room) and doc.GetElement(el).Area > 0]
+        elements = [self.__doc.GetElement(el) for el in selected_element_ids if
+                    isinstance(self.__doc.GetElement(el), Room) and self.__doc.GetElement(el).Area > 0]
         return elements
 
     @reactive
     def all_doors_on_active_view(self):
-        return self.__doors_on_active_view
-
-    def __get_doors_on_active_view(self):
-        doors = FilteredElementCollector(doc, active_view.Id).WhereElementIsNotElementType().OfCategory(
+        doors = FilteredElementCollector(self.__doc, active_view.Id).WhereElementIsNotElementType().OfCategory(
             BuiltInCategory.OST_Doors).ToElements()
         elements = elements_to_list(doors)
         return elements
 
     @reactive
     def phase(self):
-        return self.__phase
-
-    def __get_phase_on_active_view(self):
-        phase = doc.GetElement(active_view.get_Parameter(BuiltInParameter.VIEW_PHASE).AsElementId())
+        phase = self.__doc.GetElement(active_view.get_Parameter(BuiltInParameter.VIEW_PHASE).AsElementId())
         return phase
+
+
+class PluginConfig:
+    def __init__(self, floor_type, door_contour_option, door_opening_option, door_contour_offset, level_offset):
+        self.__floor_type = floor_type
+        self.__door_contour_option = door_contour_option
+        self.__door_opening_option = door_opening_option
+        self.__door_contour_offset = door_contour_offset
+        self.__level_offset = level_offset
+
+    @reactive
+    def floor_type(self):
+        return self.__floor_type
+
+    @reactive
+    def door_contour_option(self):
+        return self.__door_contour_option
+
+    @reactive
+    def door_opening_option(self):
+        return self.__door_opening_option
+
+    @reactive
+    def door_contour_offset(self):
+        return self.__door_contour_offset
+
+    @reactive
+    def level_offset(self):
+        return self.__level_offset
+
+
+class DoorContourOption:
+    def __init__(self):
+        pass
+
+    @reactive
+    def not_create(self):
+        return "Не заводить контур пола в дверные проемы"
+
+    @reactive
+    def create_full_thickness(self):
+        return "Заводить контур на всю толщину стены"
+
+    @reactive
+    def create_to_the_middle(self):
+        return "Заводить контур до середины стены"
+
+    @reactive
+    def create_for_specified_length(self):
+        return "Заводить контур на указанное значение, мм"
+
+    @reactive
+    def get_all_option(self):
+        options_list = [self.not_create,
+                        self.create_full_thickness,
+                        self.create_to_the_middle,
+                        self.create_for_specified_length]
+        return options_list
+
+
+class DoorOpeningOption:
+    def __init__(self):
+        pass
+
+    @reactive
+    def opening_in_any_direction(self):
+        return "Открывание в любую сторону"
+
+    @reactive
+    def opening_outside(self):
+        return "Открывание наружу"
+
+    @reactive
+    def opening_inside(self):
+        return "Открывание внутрь"
+
+    @reactive
+    def get_all_option(self):
+        options_list = [self.opening_in_any_direction,
+                        self.opening_outside,
+                        self.opening_inside]
+        return options_list
+
+
+class DoorWithPoints:
+    def __init__(self, door):
+        self.__door = door
+        self.__points = self.__create_two_points()
+
+    @reactive
+    def revit_door(self):
+        return self.__door
+
+    @reactive
+    def points(self):
+        return self.__points
+
+    def __create_two_points(self):
+        '''
+        Создает на определенном расстоянии 2 точки от центра двери в направлении перпендикулярном ширине двери со
+        смещением 200мм по высоте от низа вставки двери
+        return: точка, находящаяся сверху от двери в плане; точка, находящаяся снизу от двери в плане
+        '''
+        z_offset = 200
+        top_bottom_offset = 600
+        door_location = RoomContour.get_door_location(self.__door)
+        door_vector = RoomContour.get_vector_from_door(self.__door)
+        z = convert_to_millimeters(z_offset) + door_location.Z
+        dist_const_top_bottom = convert_to_millimeters(top_bottom_offset)
+        top_point = XYZ(door_location.X, door_location.Y, z) + door_vector * dist_const_top_bottom
+        bottom_point = XYZ(door_location.X, door_location.Y, z) - door_vector * dist_const_top_bottom
+
+        return top_point, bottom_point
 
 
 class RoomContour:
@@ -284,8 +312,8 @@ class RoomContour:
         loops = self.room.GetBoundarySegments(spatial_element_boundary_options)
         for loop in loops:
             curves = []
-            for i in range(len(loop)):
-                curves.append(loop[i].GetCurve())
+            for curve in loop:
+                curves.append(curve.GetCurve())
             curve_loops.append(self.simplify(curves))
         if HOST_APP.is_newer_than(2021):
             return curve_loops
@@ -356,10 +384,10 @@ class RoomContour:
         return: True, если 2 кривые имеют общую точку соединения, иначе False
         '''
 
-        x1, x2 = curve.GetEndPoint(1)[0], next_curve.GetEndPoint(0)[0]
+        x1, x2 = curve.GetEndPoint(1).X, next_curve.GetEndPoint(0).X
         diff_x = abs(x1 - x2)
 
-        y1, y2 = curve.GetEndPoint(1)[1], next_curve.GetEndPoint(0)[1]
+        y1, y2 = curve.GetEndPoint(1).Y, next_curve.GetEndPoint(0).Y
         diff_y = abs(y1 - y2)
 
         res = diff_x < 0.01 and diff_y < 0.01
@@ -430,7 +458,7 @@ class RoomContour:
         curve_loops = self.get_curve_loops_of_room()
         new_curve_loops = []
         for curve_loop in curve_loops:
-            new_curve_loop = curve_loop.CreateViaOffset(curve_loop, convert_to_value(offset), XYZ(0, 0, 1))
+            new_curve_loop = curve_loop.CreateViaOffset(curve_loop, convert_to_millimeters(offset), XYZ(0, 0, 1))
             new_curve_loops.append(new_curve_loop)
 
         virtual_solid = GeometryCreationUtilities.CreateExtrusionGeometry(new_curve_loops, XYZ(0, 0, 1), 10)
@@ -440,12 +468,15 @@ class RoomContour:
         '''
         Возвращает список всех дверей, смещенные точки которых находятся внутри помещения
         '''
+
         all_doors = self.revit_info.all_doors_on_active_view
-        doors = []
-        for door in all_doors:
-            doors.append(DoorWithPoints(door))
-        doors_with_points = DoorsWithPoints(doors)
-        doors_in_room = doors_with_points.get_doors_from_room(self.room)
+        doors_with_points = [DoorWithPoints(door) for door in all_doors]
+        doors_in_room = []
+        for door_with_points in doors_with_points:
+            points = door_with_points.points
+            for point in points:
+                if self.room.IsPointInRoom(point):
+                    doors_in_room.append(door_with_points.revit_door)
         return doors_in_room
 
     @staticmethod
@@ -510,23 +541,24 @@ class RoomContour:
         return: line - линия, созданная из центра дверного проема; is_right - направление линии - True, если линия
         вправо, False - влево, используется также и для режимов "top" и "bottom"
         '''
+        z_offset_const = 200
         door_location = self.get_door_location(door)
         door_vector = self.get_vector_from_door(door)
         normal_vector = XYZ.BasisZ.CrossProduct(door_vector).Normalize()
-        z = convert_to_value(200) + door_location[2]
-        dist_const_left_right = convert_to_value(6000)
-        dist_const_top_bottom = convert_to_value(500)
-        start_point = XYZ(door_location[0], door_location[1], z)
+        dist_const_z = convert_to_millimeters(z_offset_const) + door_location.Z
+        dist_const_left_right = convert_to_millimeters(6000)
+        dist_const_top_bottom = convert_to_millimeters(600)
+        start_point = XYZ(door_location.X, door_location.Y, dist_const_z)
         is_right = True
 
-        end_point = XYZ(door_location[0], door_location[1], z) + normal_vector * dist_const_left_right
+        end_point = XYZ(door_location.X, door_location.Y, dist_const_z) + normal_vector * dist_const_left_right
         if mode == "left":
-            end_point = XYZ(door_location[0], door_location[1], z) - normal_vector * dist_const_left_right
+            end_point = XYZ(door_location.X, door_location.Y, dist_const_z) - normal_vector * dist_const_left_right
             is_right = False
         if mode == "top":
-            end_point = XYZ(door_location[0], door_location[1], z) + door_vector * dist_const_top_bottom
+            end_point = XYZ(door_location.X, door_location.Y, dist_const_z) + door_vector * dist_const_top_bottom
         if mode == "bottom":
-            end_point = XYZ(door_location[0], door_location[1], z) - door_vector * dist_const_top_bottom
+            end_point = XYZ(door_location.X, door_location.Y, dist_const_z) - door_vector * dist_const_top_bottom
             is_right = False
         line = Line.CreateBound(start_point, end_point)
         return line, is_right
@@ -539,7 +571,7 @@ class RoomContour:
         is_right: bool направления создания до этого линии из центра проема (True - вправо, False - влево)
         return: линия, созданная перпендикулярно ширине проема
         '''
-        dist_const = convert_to_value(1000)
+        dist_const = convert_to_millimeters(1000)
         door_vector = self.get_vector_from_door(door)
         start_point = point + door_vector * dist_const
         end_point = point - door_vector * dist_const
@@ -712,10 +744,11 @@ class RoomContour:
         return line_of_door_thickness
 
     def get_specified_line(self, start_point, distance_from_user, line_of_door_thickness):
-        if 1 < float(distance_from_user) <= convert_from_value(line_of_door_thickness.Length):
+        if 1 < float(distance_from_user) <= convert_from_millimeters(line_of_door_thickness.Length):
             direction = line_of_door_thickness.Direction
             line_of_door_thickness = Line.CreateBound(start_point,
-                                                      start_point + direction * convert_to_value(distance_from_user))
+                                                      start_point + direction * convert_to_millimeters(
+                                                          distance_from_user))
             line_for_check(line_of_door_thickness)
             return line_of_door_thickness
 
@@ -731,7 +764,7 @@ class RoomContour:
         помещения)
         '''
         door_location_z = int(self.get_door_location(door).Z)
-        room_z_point = int(doc.GetElement(self.room.LevelId).Elevation) + convert_to_value(level_offset)
+        room_z_point = int(doc.GetElement(self.room.LevelId).Elevation) + convert_to_millimeters(level_offset)
         res = True
         phase = self.revit_info.phase
         room_id = self.room.Id
@@ -740,7 +773,7 @@ class RoomContour:
         if mode == 1 and door_opening_option > 0:
             if door_opening_option == 1 and door.FromRoom[phase].Id != room_id:
                 res = False
-            elif door_opening_option == 2 and door.FromRoom[phase].Id == room_id:
+            elif door_opening_option == 2 and door.ToRoom[phase].Id != room_id:
                 res = False
 
         return res
@@ -807,7 +840,7 @@ class RoomContour:
         door_vector = self.get_vector_from_door(door)
 
         start_point = self.get_start_point_for_door_contour(line_of_door_thickness, boundary_point_in_door_center)
-        distance = convert_from_value(line_of_door_thickness.Length)
+        distance = convert_from_millimeters(line_of_door_thickness.Length)
         line_of_door_thickness = self.check_line_of_door_thickness(line_of_door_thickness, start_point)
 
         if mode == 2:
@@ -929,7 +962,7 @@ class CreateFloorsByRooms:
             level_id = room.LevelId
             current_floor = Floor.Create(doc, curve_loops, floor_type.Id, level_id)
 
-        converted_level_offset = convert_to_value(level_offset)
+        converted_level_offset = convert_to_millimeters(level_offset)
         current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
 
         return current_floor
@@ -1032,6 +1065,7 @@ class CreateFloorsByRoomsCommand(ICommand):
                                                                             door_opening_option_dict(),
                                                                             self.__view_model
                                                                             .selected_door_opening))
+            
 
         elif self.__view_model.is_checked_select:
             # Если пользователь выбрал создать перекрытия по выбранным помещениям
@@ -1099,15 +1133,20 @@ class MainWindowViewModel(Reactive):
         else:
             self.__is_checked_on_view_visibility = "Hidden"
 
-        self.__room_parameters = revit_repository.room_parameters
         self.__error_text = ""
         self.__create_floors_by_rooms = CreateFloorsByRoomsCommand(self)
-        self.__doors_contours_options = door_contour_option().values()
-        self.__selected_door_contour_option = self.doors_contours_options[0]
+        # self.__doors_contours_options = door_contour_option().values()
+        self.__doors_contours_options = DoorContourOption().get_all_option
+        self.__selected_door_contour_option = DoorContourOption().not_create
         self.__door_contour_offset = "0"
         self.__is_enabled_door_contour_offset = False
-        self.__door_openings = door_opening_option_dict().values()
-        self.__selected_door_opening = self.door_openings[0]
+        self.__door_openings = DoorOpeningOption().get_all_option
+        self.__selected_door_opening = DoorOpeningOption().opening_in_any_direction
+        self.__plugin_options = PluginConfig(self.__selected_floor_type,
+                                             self.__selected_door_contour_option,
+                                             self.__selected_door_opening,
+                                             self.__door_contour_offset,
+                                             self.__level_offset)
 
     @reactive
     def floor_types(self):
@@ -1178,10 +1217,6 @@ class MainWindowViewModel(Reactive):
         return self.__is_checked_on_view_visibility
 
     @reactive
-    def room_parameters(self):
-        return self.__room_parameters
-
-    @reactive
     def selected_rooms(self):
         return self.__selected_rooms
 
@@ -1230,6 +1265,10 @@ class MainWindowViewModel(Reactive):
     @reactive
     def door_openings(self):
         return self.__door_openings
+
+    @reactive
+    def plugin_options(self):
+        return self.__plugin_options
 
 
 @notification()
