@@ -9,5 +9,7 @@ tooltip:
 assembly: RevitLintelPlacement.dll
 command_class: PlaceLintelCommand
 
+help_url: "https://wiki.a101.ru/pages/viewpage.action?pageId=9211053"
+
 min_revit_version: 2020
 max_revit_version: 2024
