@@ -903,7 +903,7 @@ class RoomFloorContour:
         room_curve_loops = self.room_contour.get_curve_loops_of_room_by_walls()
         doors = self.get_doors_from_room()
         room_solid = GeometryCreationUtilities.CreateExtrusionGeometry(room_curve_loops, XYZ(0, 0, 1), 1)
-        if self.plugin_options.door_contour_option != DoorContourOptionEnum.not_create:
+        if self.plugin_options.door_contour_option != DoorContourOptionEnum().not_create:
             if len(doors) > 0:
                 z = self.room_contour.get_z_from_curve_loops(room_curve_loops)
                 for door in doors:
@@ -952,6 +952,8 @@ class CreateFloorsByRooms:
 
         converted_level_offset = convert_to_millimeters(level_offset)
         current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
+        room_boundary_param = current_floor.get_Parameter(BuiltInParameter.WALL_ATTR_ROOM_BOUNDING)
+        room_boundary_param.Set(False)
 
         return current_floor
 
