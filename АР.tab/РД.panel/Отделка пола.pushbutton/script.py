@@ -56,7 +56,7 @@ def is_int(value):
         return False
 
 
-def show_error_message(room_ids, doors_ids):
+def show_error_message(room_ids):
     output = script.get_output()
     output.insert_divider(level="Не удалось создать пол по контуру помещения:")
     for idx, elid in enumerate(room_ids):
@@ -1132,7 +1132,6 @@ class CreateFloorsByRooms:
         plugin_options: настройки, выбранные пользователем в окне запуска скрипта
         '''
         error_ids = []
-        doors_error_ids = []
         if HOST_APP.is_older_than(2022):
             with revit.Transaction("BIM: Создание перекрытий"):
                 rooms_and_floors_dict = {}
@@ -1155,7 +1154,7 @@ class CreateFloorsByRooms:
                     except:
                         error_ids.append(room.Id)
         if len(error_ids) > 0:
-            show_error_message(error_ids, doors_error_ids)
+            show_error_message(error_ids)
 
 
 class CreateFloorsByRoomsCommand(ICommand):
@@ -1239,8 +1238,6 @@ class MainWindowViewModel(Reactive):
         self.__is_checked_selected = False
         if len(self.__selected_rooms) > 0:
             self.__is_already_enabled = True
-            self.__is_checked_selected_content = ("По предварительно выбранным помещениям ({})"
-                                                  .format(len(self.__selected_rooms)))
             self.__is_checked_selected = True
             self.__is_checked_select = False
         else:
@@ -1299,10 +1296,6 @@ class MainWindowViewModel(Reactive):
     @is_checked_selected.setter
     def is_checked_selected(self, value):
         self.__is_checked_selected = value
-
-    @reactive
-    def is_checked_selected_content(self):
-        return self.__is_checked_selected_content
 
     @reactive
     def is_checked_select(self):
