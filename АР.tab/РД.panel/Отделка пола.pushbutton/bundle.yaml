@@ -5,8 +5,21 @@ title:
     Floor finishing
 
 tooltip:
-  ru: На плане этажа создает перекрытия по выбранным помещениям.
-  en_us: On the floor plan, floors are created for the selected rooms.
+  ru: >-
+    На плане этажа создает перекрытия по выбранным помещениям.
+    
+    
+    1. Перейдите на план этажа
+    
+    2. Запустите скрипт
+
+  en_us: >-
+    On the floor plan, floors are created for the selected rooms.
+    
+    
+    1. Go to floor plan
+    
+    2. Run the script
 
 context: active-floor-plan
 

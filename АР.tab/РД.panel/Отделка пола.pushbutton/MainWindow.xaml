@@ -54,6 +54,7 @@
                     Margin="5 10 10 10"
                     VerticalContentAlignment="Center"
                     ItemsSource="{Binding doors_contours_options}"
+                    DisplayMemberPath="name"
                     SelectedItem="{Binding selected_door_contour_option}"/>
                 <TextBlock Grid.Row="3" Grid.Column="0"
                         VerticalAlignment="Center"
@@ -88,6 +89,7 @@
                     Margin="5 10"
                     VerticalContentAlignment="Center"
                     ItemsSource="{Binding door_openings}"
+                    DisplayMemberPath="name"
                     SelectedItem="{Binding selected_door_opening}"/>
                 <Rectangle
                     Grid.Row="3" Grid.Column="2"
@@ -126,11 +128,18 @@
                 <RowDefinition/>
             </Grid.RowDefinitions>
             <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center" Margin="235,0,0,0">
-                <RadioButton Content="{Binding is_checked_selected_content, FallbackValue=is_checked_selected_content}"
+                <RadioButton
                              VerticalAlignment="Center"
                              HorizontalAlignment="Left"
-                             Visibility="{Binding is_checked_on_view_visibility, FallbackValue=is_checked_on_view_visibility}"
+
+                             IsEnabled="{Binding is_already_enabled}"
                              IsChecked="{Binding is_checked_selected, FallbackValue=is_checked_selected}">
+                    <RadioButton.Content>
+                        <DockPanel>
+                            <TextBlock Text="По предварительно выбранным помещениям"/>
+                            <TextBlock Text="{Binding selected_rooms.Count, StringFormat={} ({0})}"/>
+                        </DockPanel>
+                    </RadioButton.Content>
                 </RadioButton>
                 <RadioButton Content="По выбранным помещениям"
                              VerticalAlignment="Center"
