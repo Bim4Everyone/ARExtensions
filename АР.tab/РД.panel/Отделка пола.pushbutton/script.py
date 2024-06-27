@@ -1253,15 +1253,15 @@ class MainWindowViewModel(Reactive):
         self.__door_openings = [DoorOpeningInAnyDirection(), DoorOpeningInside(), DoorOpeningOutside()]
         self.__selected_door_opening = self.__door_openings[0]
 
-    @reactive
+    @property
     def floor_types(self):
         return self.__floor_types
 
-    @reactive
+    @property
     def rooms_on_active_view(self):
         return self.__rooms_on_active_view
 
-    @reactive
+    @property
     def selected_door_opening(self):
         return self.__selected_door_opening
 
@@ -1273,7 +1273,7 @@ class MainWindowViewModel(Reactive):
     def create_floors_by_rooms(self):
         return self.__create_floors_by_rooms
 
-    @reactive
+    @property
     def selected_floor_type(self):
         return self.__selected_floor_type
 
@@ -1281,7 +1281,7 @@ class MainWindowViewModel(Reactive):
     def selected_floor_type(self, value):
         self.__selected_floor_type = value
 
-    @reactive
+    @property
     def level_offset(self):
         return self.__level_offset
 
@@ -1289,7 +1289,7 @@ class MainWindowViewModel(Reactive):
     def level_offset(self, value):
         self.__level_offset = value
 
-    @reactive
+    @property
     def is_checked_selected(self):
         return self.__is_checked_selected
 
@@ -1297,7 +1297,7 @@ class MainWindowViewModel(Reactive):
     def is_checked_selected(self, value):
         self.__is_checked_selected = value
 
-    @reactive
+    @property
     def is_checked_select(self):
         return self.__is_checked_select
 
@@ -1305,7 +1305,7 @@ class MainWindowViewModel(Reactive):
     def is_checked_select(self, value):
         self.__is_checked_select = value
 
-    @reactive
+    @property
     def is_checked_on_view(self):
         return self.__is_checked_on_view
 
@@ -1313,15 +1313,15 @@ class MainWindowViewModel(Reactive):
     def is_checked_on_view(self, value):
         self.__is_checked_on_view = value
 
-    @reactive
+    @property
     def is_already_enabled(self):
         return self.__is_already_enabled
 
-    @reactive
+    @property
     def selected_rooms(self):
         return self.__selected_rooms
 
-    @reactive
+    @property
     def error_text(self):
         return self.__error_text
 
@@ -1329,11 +1329,11 @@ class MainWindowViewModel(Reactive):
     def error_text(self, value):
         self.__error_text = value
 
-    @reactive
+    @property
     def doors_contours_options(self):
         return self.__doors_contours_options
 
-    @reactive
+    @property
     def selected_door_contour_option(self):
         return self.__selected_door_contour_option
 
@@ -1345,7 +1345,7 @@ class MainWindowViewModel(Reactive):
             self.is_enabled_door_contour_offset = False
         self.__selected_door_contour_option = value
 
-    @reactive
+    @property
     def door_contour_offset(self):
         return self.__door_contour_offset
 
@@ -1353,7 +1353,7 @@ class MainWindowViewModel(Reactive):
     def door_contour_offset(self, value):
         self.__door_contour_offset = value
 
-    @reactive
+    @property
     def is_enabled_door_contour_offset(self):
         return self.__is_enabled_door_contour_offset
 
@@ -1363,7 +1363,7 @@ class MainWindowViewModel(Reactive):
             self.door_contour_offset = "0"
         self.__is_enabled_door_contour_offset = value
 
-    @reactive
+    @property
     def door_openings(self):
         return self.__door_openings
 
