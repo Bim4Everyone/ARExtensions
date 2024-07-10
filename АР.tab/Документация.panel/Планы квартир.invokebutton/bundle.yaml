@@ -1,12 +1,32 @@
 title:
   ru: Планы квартир
-  en_us: Планы квартир
+  en_us: Apartment plans
 
 tooltip:
   ru: >- 
-    Please Write Description
+    Создает планы выбранных квартир с назначенными шаблонами
+    
+    
+    Для запуска плагина необходимо, чтобы активный вид был планом.
+    
+    
+    1. Открыть документ, перейти на план и запустить плагин.
+    
+    2. Задать отступ, выбрать параметр для группировки помещений по квартирам, добавить шаблоны, выбрать квартиры.
+    
+    3. Нажать "ОК"
   en_us: >- 
-    Please Write Description
+    Creates plans for selected apartments with applied view templates
+    
+    
+    Before you start the plugin, make sure your active view is plan.
+    
+    
+    1. Open document, open plan and start the plugin.
+    
+    2. Set offset, select grouping parameter, add view templates, select apartments.
+    
+    3. Press "OK".
 
 assembly: RevitApartmentPlans.dll
 command_class: RevitApartmentPlansCommand
