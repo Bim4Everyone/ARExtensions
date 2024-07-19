@@ -1,0 +1,17 @@
+title:
+  ru: Декларации
+  en_us: Declarations
+
+tooltip:
+  ru: Выгружает декларацию по квартирам в формате Excel или json.
+
+  en_us: Creates a declaration for apartments in Excel or json.
+
+assembly: RevitDeclarations.dll
+command_class: RevitDeclarationsCommand
+
+author: sssenya
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=134087701"
+
+min_revit_version: 2022
+max_revit_version: 2024
