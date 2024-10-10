@@ -1,0 +1,17 @@
+title:
+  ru: Маркировка сплошная
+  en_us: Marking continuous
+
+tooltip:
+  ru: "Заполняет у проемов и отверстий параметр ""ФОП_Марка проема"" при помощи Excel"
+
+  en_us: "Fills in the parameter ""ФОП_Марка проема"" for openings and holes with Excel"
+
+engine:
+  clean: false
+
+author: KozlovPS
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=110566270"
+
+min_revit_version: 2022
+max_revit_version: 2024

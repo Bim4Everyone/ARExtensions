@@ -1,0 +1,14 @@
+title:
+  ru: Маркировка
+  en_us: Marking
+
+tooltip:
+  ru: "Заполняет у проемов и отверстий параметр ""ФОП_Марка проема"""
+
+  en_us: "Fills in the parameter ""ФОП_Марка проема"" for openings and holes"
+
+author: KozlovPS
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=110566268"
+
+min_revit_version: 2022
+max_revit_version: 2024

@@ -1,0 +1,32 @@
+title:
+  ru: Отметки
+  en_us: Elevations
+
+tooltip:
+  ru: >-
+    Заполняет у проемов и отверстий параметры:
+    
+    - "ФОП_Отметка от нуля";
+    
+    - "ФОП_Отметка от плиты КР";
+    
+    - "ФОП_Отметка от уровня";
+    
+    - "ФОП_Группирование".
+
+  en_us: >-
+    Fills in the parameters for openings and holes:
+    
+    - "ФОП_Отметка от нуля";
+    
+    - "ФОП_Отметка от плиты КР";
+    
+    - "ФОП_Отметка от уровня";
+    
+    - "ФОП_Группирование".
+
+author: KozlovPS
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=110566266"
+
+min_revit_version: 2022
+max_revit_version: 2024
