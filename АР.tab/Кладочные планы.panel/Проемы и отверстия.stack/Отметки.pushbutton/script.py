@@ -111,6 +111,7 @@ class CreateCommand(ICommand):
         all_elements = [doc.GetElement(id) for id in SELECTED_IDS]
         if len(all_elements) == 0:
             alert("Ничего не выбрано. Выберите элементы.")
+            script.exit()
 
         with revit.Transaction("BIM: Создаем 3D-вид"):
             # Создаем 3Д вид
@@ -143,6 +144,7 @@ class CreateCommand(ICommand):
                 pass
             else:
                 alert("Выбраны недопустимые элементы.")
+                script.exit()
 
     def create_3D(self, VIEWS):
         view_types = FilteredElementCollector(doc).OfClass(ViewFamilyType).ToElements()

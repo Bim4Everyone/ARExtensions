@@ -58,7 +58,7 @@
             <Button
                 Width="100"
                 Margin="10, 0"
-                Content="Создать"
+                Content="Ок"
                 Command="{Binding create_command}"
                 Click="ButtonOK_Click"/>
             <Button

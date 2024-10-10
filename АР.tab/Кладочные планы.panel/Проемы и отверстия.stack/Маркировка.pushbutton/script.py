@@ -89,6 +89,7 @@ class CreateCommand(ICommand):
 
         if len(all_elements) == 0:
             alert("Ничего не выбрано. Выберите элементы.")
+            script.exit()
 
         with revit.Transaction("BIM: Подготовка к маркировке"):
             result_openings_list = []
@@ -123,6 +124,7 @@ class CreateCommand(ICommand):
                 pass
             else:
                 alert("Выбраны недопустимые элементы.")
+                script.exit()
 
     def group_elements_list(self, list):
         # создаем словарь и группируем отсортированный список по коду

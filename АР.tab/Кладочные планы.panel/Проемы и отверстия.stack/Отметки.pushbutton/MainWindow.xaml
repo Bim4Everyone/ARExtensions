@@ -7,11 +7,12 @@
     Title="Проемы и отверстия стен. Отметки"
     mc:Ignorable="d"
     WindowStartupLocation="CenterScreen"
-    Height="500" Width="500"
-    MinHeight="350" MinWidth="500">
+    Height="150" Width="500"
+    MinHeight="150" MinWidth="500">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="45" />
+            <RowDefinition Height="30" />
+            <RowDefinition Height="30" />
             <RowDefinition />
             <RowDefinition Height="45" />
         </Grid.RowDefinitions>
@@ -30,7 +31,7 @@
             Text="{Binding unique_identifier, UpdateSourceTrigger=PropertyChanged}"/>
 
         <StackPanel
-            Grid.Row="2"
+            Grid.Row="3"
             Margin="10,5,10,10"
             Grid.ColumnSpan="2"
             Orientation="Horizontal"
@@ -43,7 +44,7 @@
             <Button
                 Width="100"
                 Margin="10, 0"
-                Content="Создать"
+                Content="Ок"
                 Command="{Binding create_command}"
                 Click="ButtonOK_Click"/>
             <Button

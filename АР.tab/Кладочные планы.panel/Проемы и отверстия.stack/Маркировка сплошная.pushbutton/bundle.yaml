@@ -3,9 +3,11 @@ title:
   en_us: Marking continuous
 
 tooltip:
-  ru: "Заполняет у проемов и отверстий параметр ""ФОП_Марка проема"" при помощи Excel"
+  ru: >-
+    Заполняет у проемов и отверстий параметр "ФОП_Марка проема" при помощи Excel
 
-  en_us: "Fills in the parameter ""ФОП_Марка проема"" for openings and holes with Excel"
+  en_us: >-
+    Fills in the parameter "ФОП_Марка проема" for openings and holes with Excel
 
 engine:
   clean: false
