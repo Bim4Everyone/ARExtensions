@@ -1,0 +1,17 @@
+title:
+  ru: 15.3 Нежилые
+  en_us: 15.3 Commercial Areas
+
+tooltip:
+  ru: Выгружает декларацию по нежилым помещениям в формате Excel.
+
+  en_us: Creates a declaration for apartments in Excel or json.
+
+assembly: RevitDeclarations.dll
+command_class: CommercialDeclarationCommand
+
+author: sssenya
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=134087701"
+
+min_revit_version: 2022
+max_revit_version: 2024
