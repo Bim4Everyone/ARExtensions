@@ -30,7 +30,7 @@ log_debug = False
 log_point_debug = False
 log_elapsed_time_debug = False
 
-text_debug = False
+text_debug = True
 circle_debug = False
 
 eps = 1.0e-9
@@ -64,8 +64,7 @@ def create_text(text, location):
     if text_debug:
         options = TextNoteOptions()
         options.Rotation = 0
-        # options.TypeId = ElementId(27712)
-        options.TypeId = ElementId(366012)
+        options.TypeId = FilteredElementCollector(document).OfClass(TextNoteType).FirstElementId()
         options.VerticalAlignment = VerticalTextAlignment.Middle
         options.HorizontalAlignment = HorizontalTextAlignment.Center
 
@@ -85,10 +84,6 @@ def convert_value(value):
         return UnitUtils.ConvertToInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
     else:
         return UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Millimeters)
-
-
-def get_index_point(element, index_points):
-    return next((index_point for index_point in index_points if index_point.PassesFilter(element)), None)
 
 
 def get_index_points(curve):
@@ -137,43 +132,11 @@ def get_index_points(curve):
                 index += 1
                 create_text(index, current_point)
 
-                yield IndexElementPoint(index, current_point)
-
+                yield current_point
             continue
 
     index += 1
     create_text(index, curve.GetEndPoint(1))
-
-
-def get_index_elements(curve, elements):
-    if elements:
-        index_points = get_index_points(curve)
-        index_points = sorted(index_points, key=lambda x: x.Index)
-
-        for room in elements:
-            index_point = get_index_point(room.room_obj, index_points)
-            if index_point:
-                yield IndexElement(index_point.Index, room.room_obj)
-
-
-class IndexElement:
-    def __init__(self, index, element):
-        self.Index = index
-        self.Element = element
-
-
-class IndexElementPoint(IndexElement):
-    def __init__(self, index, point):
-        IndexElement.__init__(self, index, point)
-
-    def PassesFilter(self, element):
-        bb = element.get_BoundingBox(None)
-        if bb:
-            point = XYZ(self.Element.X, self.Element.Y, bb.Min.Z)
-        else:
-            point = XYZ(self.Element.X, self.Element.Y, element.Location.Point.Z)
-
-        return BoundingBoxContainsPointFilter(point).PassesFilter(element)
 
 
 class MainWindow(WPFWindow):
@@ -343,33 +306,34 @@ class NumerateRoomsCommand(ICommand):
         stopwatch = Stopwatch.StartNew()
 
         view_model = self.__view_model
-        elements = self.__revit_repository.get_filtered_rooms_by_group()
+        selected_rooms = self.__revit_repository.get_filtered_rooms_by_group()
+        selected_room_ids = [x.room_obj.Id for x in selected_rooms]
+        selected_curve = view_model.curve_element.Location.Curve
+        room_number = int(view_model.start_number)
+        rooms_set = set()
+        fix_param = ProjectParamsConfig.Instance.IsRoomNumberFix
+        phase_id = document.ActiveView.GetParamValueOrDefault(BuiltInParameter.VIEW_PHASE)
+        phase = document.GetElement(phase_id)
 
         try:
-            curve = view_model.curve_element.Location.Curve
-            elements = [element for element in elements
-                        if element.is_intersect_curve(view_model.curve_element)]
-            fix_param = ProjectParamsConfig.Instance.IsRoomNumberFix
-
             with revit.Transaction("BIM: Нумерация по линии"):
-                index_elements = get_index_elements(curve, elements)
-                index_elements = sorted(index_elements, key=lambda x: x.Index)
+                index_points = get_index_points(selected_curve)
+                rooms = [document.GetRoomAtPoint(x, phase) for x in index_points]
+                rooms = [x for x in rooms if x and x.Id in selected_room_ids]
 
-                index = int(view_model.start_number)
+                for room in rooms:
+                    if room.Id not in rooms_set:
+                        if not room.GetParamValueOrDefault(fix_param):
+                            value = view_model.prefix + str(room_number) + view_model.suffix
+                            room.SetParamValue(view_model.param_name, value)
 
-                for index_element in index_elements:
-                    if not index_element.Element.GetParamValueOrDefault(fix_param):
-                        value = view_model.prefix + str(index) + view_model.suffix
-                        index_element.Element.SetParamValue(view_model.param_name, value)
+                            log_information(
+                                "Id: {} Room Number: {}".format(output.linkify(room.Id), room_number))
 
-                        log_information(
-                            "Id: {} ComputedIndex: {} Index: {}"
-                            .format(output.linkify(index_element.Element.Id),
-                                                                        index_element.Index,
-                                                                        index))
+                            rooms_set.add(room.Id)
+                            room_number += 1
 
-                        index += 1
-                alert("Последний назначенный номер: {}".format(index-1))
+                alert("Последний назначенный номер: {}".format(room_number - 1))
 
         finally:
             stopwatch.Stop()
