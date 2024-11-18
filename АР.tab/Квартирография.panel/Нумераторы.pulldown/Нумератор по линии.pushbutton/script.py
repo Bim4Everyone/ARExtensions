@@ -30,7 +30,7 @@ log_debug = False
 log_point_debug = False
 log_elapsed_time_debug = False
 
-text_debug = True
+text_debug = False
 circle_debug = False
 
 eps = 1.0e-9
