@@ -1,6 +1,6 @@
 title:
-  ru: Декларации
-  en_us: Declarations
+  ru: 15.2 Жилые
+  en_us: 15.2 Apartments
 
 tooltip:
   ru: Выгружает декларацию по квартирам в формате Excel или json.
@@ -8,7 +8,7 @@ tooltip:
   en_us: Creates a declaration for apartments in Excel or json.
 
 assembly: RevitDeclarations.dll
-command_class: RevitDeclarationsCommand
+command_class: ApartmentsDeclarationCommand
 
 author: sssenya
 help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=134087701"
