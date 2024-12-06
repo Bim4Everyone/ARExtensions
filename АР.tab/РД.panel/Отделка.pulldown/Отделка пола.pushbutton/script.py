@@ -34,14 +34,14 @@ uidoc = __revit__.ActiveUIDocument
 active_view = doc.ActiveView
 
 
-def convert_to_millimeters(value):
+def convert_from_millimeters_to_feet(value):
     if HOST_APP.is_older_than(2022):
         return UnitUtils.ConvertToInternalUnits(int(value), DisplayUnitType.DUT_MILLIMETERS)
     else:
         return UnitUtils.ConvertToInternalUnits(int(value), UnitTypeId.Millimeters)
 
 
-def convert_from_millimeters(value):
+def convert_to_millimeters_from_feet(value):
     if HOST_APP.is_older_than(2022):
         return UnitUtils.ConvertFromInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
     else:
@@ -346,8 +346,8 @@ class DoorWithPoints:
         смещением 200мм по высоте от низа вставки двери
         return: точка, находящаяся сверху от двери в плане; точка, находящаяся снизу от двери в плане
         '''
-        z_offset = convert_to_millimeters(200)  # смещение по высоте от низа дверного проема, мм
-        top_bottom_offset = convert_to_millimeters(
+        z_offset = convert_from_millimeters_to_feet(200)  # смещение по высоте от низа дверного проема, мм
+        top_bottom_offset = convert_from_millimeters_to_feet(
             600)  # смещение в плане вперед/назад от центра точки вставки двери,мм
         door_location = DoorContourFactory.get_door_location(self.__door)
         if door_location is None:
@@ -407,6 +407,11 @@ class SolidOperations:
             return res_solid
         return host_solid
 
+    def get_room_solid(self, room):
+        geometry = room.get_Geometry(Options())
+        for g in geometry:
+            if isinstance(g, Solid):
+                return g
 
 class DoorContourParams:
     def __init__(self):
@@ -465,6 +470,12 @@ class DoorContourParams:
     def door_vector(self, value):
         self.__door_vector = value
 
+def create_direct_shape(solid):
+    directShape = DirectShape.CreateElement(doc, ElementId(BuiltInCategory.OST_GenericModel))
+
+    # Устанавливаем геометрию для DirectShape
+    directShape.SetShape([solid])
+    return directShape
 
 class DoorContourFactory:
     def __init__(self, room, door):
@@ -483,12 +494,10 @@ class DoorContourFactory:
         return: точка, полученная при пересечении линии, запущенной из центра дверного проема и Solid помещения
         '''
         line, is_right = self.create_line_from_door(DirectionEnum.top)
-
         intersect_opt_inside = SolidCurveIntersectionOptions()
         intersect_opt_outside = SolidCurveIntersectionOptions()
         intersect_opt_outside.ResultType = SolidCurveIntersectionMode.CurveSegmentsOutside
         intersect = room_solid.IntersectWithCurve(line, intersect_opt_inside)
-
         if intersect.SegmentCount < 1:
             # Если линия, запущенная вверх не пересекла Solid помещения - создание линии по направлению вниз от проема
             # и повторная проверка на пересечение
@@ -498,7 +507,6 @@ class DoorContourFactory:
             if intersect.SegmentCount > 0:
                 # Если линия, запущенная вверх пересекла Solid помещения - замена результата проверки на внешние кривые
                 intersect = room_solid.IntersectWithCurve(line, intersect_opt_outside)
-
         else:
             # Если линия, запущенная вверх пересекла Solid помещения - замена результата проверки на внешние кривые
             intersect = room_solid.IntersectWithCurve(line, intersect_opt_outside)
@@ -516,15 +524,15 @@ class DoorContourFactory:
         return: line - линия, созданная из центра дверного проема; is_right - направление линии - True, если линия
         вправо, False - влево, используется также и для режимов "top" и "bottom"
         '''
-        z_offset_const = convert_to_millimeters(200)  # отступ от низа дверного проема, мм
+        z_offset_const = convert_from_millimeters_to_feet(200)  # отступ от низа дверного проема, мм
         door_location = self.get_door_location(self.door)
         if door_location is None:
             return None
         door_vector = self.get_vector_from_door(self.door)
         normal_vector = XYZ.BasisZ.CrossProduct(door_vector).Normalize()
         dist_const_z = z_offset_const + door_location.Z
-        dist_const_left_right = convert_to_millimeters(6000)  # длина линии, запущенной влево/вправо
-        dist_const_top_bottom = convert_to_millimeters(500)  # длина линии, запущенной вперед/назад
+        dist_const_left_right = convert_from_millimeters_to_feet(6000)  # длина линии, запущенной влево/вправо
+        dist_const_top_bottom = convert_from_millimeters_to_feet(500)  # длина линии, запущенной вперед/назад
         start_point = XYZ(door_location.X, door_location.Y, dist_const_z)
         is_right = True
         end_point = XYZ(door_location.X, door_location.Y, dist_const_z) + normal_vector * dist_const_left_right
@@ -546,7 +554,7 @@ class DoorContourFactory:
         is_right: bool направления создания до этого линии из центра проема (True - вправо, False - влево)
         return: линия, созданная перпендикулярно ширине проема
         '''
-        dist_const = convert_to_millimeters(1000)  # длина линии запускаемой линии в мм
+        dist_const = convert_from_millimeters_to_feet(1000)  # длина линии запускаемой линии в мм
         door_vector = self.get_vector_from_door(self.door)
         start_point = point + door_vector * dist_const
         end_point = point - door_vector * dist_const
@@ -688,10 +696,10 @@ class DoorContourFactory:
         distance_from_user = plugin_options.door_contour_offset
         start_point = info_for_create.start_point
         min_dist = 1  # мм для минимального расстояния
-        if min_dist < float(distance_from_user) <= convert_from_millimeters(info_for_create.distance):
+        if min_dist < float(distance_from_user) <= convert_to_millimeters_from_feet(info_for_create.distance):
             direction = info_for_create.line_of_door_thickness.Direction
             info_for_create.line_of_door_thickness = Line.CreateBound(start_point,
-                                                                      start_point + direction * convert_to_millimeters(
+                                                                      start_point + direction * convert_from_millimeters_to_feet(
                                                                           distance_from_user))
             return info_for_create
 
@@ -700,12 +708,13 @@ class DoorContourFactory:
         Проверка соответствия положения перекрытия и дверного проема по z координате
         '''
         door_location_z = float(self.get_door_location(self.door).Z)
-        room_z_point = float(doc.GetElement(self.room.LevelId).Elevation + convert_to_millimeters(
-            plugin_options.level_offset))
+        room_level_point_z = doc.GetElement(self.room.LevelId).Elevation
+        floor_z_point = float(room_level_point_z + convert_from_millimeters_to_feet(plugin_options.level_offset))
         res = True
-        diff = convert_to_millimeters(1)  # разница между положением низа помещения и двери
-        if abs(door_location_z - room_z_point) > diff:
-            res = False
+        diff = convert_from_millimeters_to_feet(300)  # разница между положением низа создаваемого перекрытия и двери
+        if door_location_z > floor_z_point:
+            if abs(door_location_z - floor_z_point) > diff:
+                res = False
         return res
 
     def get_base_info_for_door_contour(self):
@@ -720,14 +729,12 @@ class DoorContourFactory:
 
         # Создание линии из центра дверного проема вправо
         first_line, is_right = self.create_line_from_door(DirectionEnum.right)
-
         # Формирование виртуального Solid из всех стен (включая стену-основу), присоединенных к основе стены дверного
         # проема
         wall_solid = self.solid_operations.get_solid_from_host_walls(self.door)
-        room_solid = self.room_contour.create_virtual_solid_of_room()
+        room_solid = self.solid_operations.get_room_solid(self.room)
 
         boundary_point_in_door_center = self.get_boundary_point_from_room_in_door_center(room_solid)
-
         # Проверка на пересечение линии, запущенной вправо
         intersect_opt_inside = SolidCurveIntersectionOptions()
         intersect_opt_outside = SolidCurveIntersectionOptions()
@@ -765,7 +772,7 @@ class DoorContourFactory:
         info_for_create.start_point = self.get_start_point_for_door_contour(line_of_door_thickness,
                                                                             boundary_point_in_door_center)
 
-        info_for_create.distance = convert_from_millimeters(line_of_door_thickness.Length)
+        info_for_create.distance = convert_to_millimeters_from_feet(line_of_door_thickness.Length)
         info_for_create.line_of_door_thickness = self.check_line_of_door_thickness(line_of_door_thickness,
                                                                                    info_for_create.start_point)
 
@@ -793,7 +800,17 @@ class DoorContourFactory:
         door_normal = door.FacingOrientation.Normalize()
         return door_normal
 
+def create_test_model_line(geom_line):
+    dir = geom_line.Direction.Normalize()
+    x = dir.X
+    y = dir.Y
+    z = dir.Z
 
+    origin = geom_line.Origin
+    normal = XYZ(z - y, x - z, y - x)
+    plane = Plane.CreateByNormalAndOrigin(normal, origin)
+    sketch = SketchPlane.Create(doc, plane)
+    doc.Create.NewModelCurve(geom_line, sketch)
 class SimplifyCurves:
     def __init__(self, curves_list):
         self.__curves_list = curves_list
@@ -914,7 +931,7 @@ class RoomWallsContour:
         curve_loops = self.get_curve_loops_of_room_by_walls()
         new_curve_loops = []
         for curve_loop in curve_loops:
-            new_curve_loop = curve_loop.CreateViaOffset(curve_loop, convert_to_millimeters(offset), XYZ(0, 0, 1))
+            new_curve_loop = curve_loop.CreateViaOffset(curve_loop, convert_from_millimeters_to_feet(offset), XYZ(0, 0, 1))
             new_curve_loops.append(new_curve_loop)
 
         virtual_solid = GeometryCreationUtilities.CreateExtrusionGeometry(new_curve_loops, XYZ(0, 0, 1), 10)
@@ -1106,7 +1123,7 @@ class CreateFloorsByRooms:
             level_id = room.LevelId
             current_floor = Floor.Create(doc, curves, floor_type.Id, level_id)
 
-        converted_level_offset = convert_to_millimeters(level_offset)
+        converted_level_offset = convert_from_millimeters_to_feet(level_offset)
         current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
         room_boundary_param = current_floor.get_Parameter(BuiltInParameter.WALL_ATTR_ROOM_BOUNDING)
         room_boundary_param.Set(False)
