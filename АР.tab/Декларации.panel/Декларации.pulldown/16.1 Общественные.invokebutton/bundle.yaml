@@ -3,9 +3,33 @@ title:
   en_us: 16.1 Public Areas
 
 tooltip:
-  ru: Выгружает декларацию по помещениям МОП в формате Excel.
+  ru: >-
+    Выгружает декларацию из текущего проекта и из связанных файлов 
+    по помещениям МОП в формате Excel или csv.
+    
+    
+    1. В настройках скрипта задайте имя файла декларации, путь и формат.
+    
+    2. Выберите доступные проекты для выгрузки и стадию помещений.
+    
+    3. Задайте количество знаком после запятой для расчета ПЛОЩАДЕЙ помещений.
+    
+    4. На вкладке "Параметры" необходимо заполнить все параметры из списка. 
+    Дополнительную информацию о каждом параметре можно узнать, 
+    если навести курсор на кнопку "?"
 
-  en_us: Creates a declaration for apartments in Excel or json.
+  en_us: >-
+    Creates a declaration for public rooms in Excel or csv.
+    
+    
+    1. Set declaration name, path and file format in the settings.
+    
+    2. Select available projects and a phase for rooms.
+    
+    3. Set accuracy for room AREAS calculation.
+    
+    4. At "Parameters" tab set all parameters in the list.
+    Check a tooltip at "?" button for more information.
 
 assembly: RevitDeclarations.dll
 command_class: PublicAreasDeclarationCommand
