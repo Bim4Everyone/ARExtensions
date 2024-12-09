@@ -1013,10 +1013,11 @@ class RoomWallsContour:
         plane = curve_loop.GetPlane()
         normal = plane.Normal  # Нормаль плоскости границ помещения
 
-        # Инвертируем направление смещения, чтобы оно шло внутрь помещения
-        inward_offset_distance = offset_distance
+        if not curve_loop.IsCounterclockwise(normal):
+            # Если ориентация по часовой стрелке, инвертируем нормаль
+            normal = -normal
+        inward_offset_distance = -offset_distance
 
-        # Создаём новый смещённый CurveLoop
         offset_curve_loop = CurveLoop.CreateViaOffset(curve_loop, inward_offset_distance, normal)
         return offset_curve_loop
 
