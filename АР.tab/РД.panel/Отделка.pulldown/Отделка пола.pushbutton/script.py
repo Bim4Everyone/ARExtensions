@@ -643,24 +643,6 @@ class DoorContourFactory:
 
         return line_of_door_thickness
 
-    def extend_curve(self, curve, extension_length):
-        """
-        Увеличивает длину линии, расширяя ее равномерно в обе стороны.
-
-        :param curve: Исходная кривая (Curve).
-        :param extension_length: Длина, на которую нужно увеличить кривую (положительное значение).
-        :return: Новая кривая с увеличенной длиной.
-        """
-        # Увеличение длины линии
-        start_point = curve.GetEndPoint(0)
-        end_point = curve.GetEndPoint(1)
-        direction = (end_point - start_point).Normalize()  # Направление линии
-
-        # Смещаем начальную и конечную точки
-        new_start = start_point - direction * (extension_length / 2)
-        new_end = end_point + direction * (extension_length / 2)
-        return Line.CreateBound(new_start, new_end)
-
     def get_start_point_for_door_contour(self, line_of_door_thickness, boundary_point_in_door_center):
         '''
         Находит стартовую точку для построения контура дверного проема
@@ -670,28 +652,6 @@ class DoorContourFactory:
         return: стартовая точка для построения контура проема
         '''
         points = []
-        # const_length = convert_from_millimeters_to_feet(6000)
-        # door_vector = self.get_vector_from_door(self.door)
-        # normal_vector = XYZ.BasisZ.CrossProduct(door_vector).Normalize()
-        # extended_line_of_door_thickness = self.extend_curve(line_of_door_thickness,
-        #                                                     const_length)
-        # start_point = XYZ(boundary_point_in_door_center.X,
-        #                   boundary_point_in_door_center.Y,
-        #                   boundary_point_in_door_center) - normal_vector * const_length
-        # end_point = XYZ(boundary_point_in_door_center.X,
-        #                 boundary_point_in_door_center.Y,
-        #                 boundary_point_in_door_center) + normal_vector * const_length
-        # wide_door_line = Line.CreateBound(start_point, end_point)
-        # intersection_results = StrongBox[IntersectionResultArray]()
-        # result = wide_door_line.Intersect(extended_line_of_door_thickness, intersection_results)
-        # if result == SetComparisonResult.Overlap:
-        #     # Получаем массив результатов пересечения
-        #     intersection_result_array = intersection_results.Value
-        #
-        #     if intersection_result_array and intersection_result_array.Size > 0:
-        #         # Извлекаем первую точку пересечения
-        #         intersection_point = intersection_result_array.get_Item(0).XYZPoint
-        #         return intersection_point
         check_start_point = line_of_door_thickness.GetEndPoint(0)
         points.append(check_start_point)
         check_end_point = line_of_door_thickness.GetEndPoint(1)
@@ -741,7 +701,8 @@ class DoorContourFactory:
             if options_for_create.is_right:
                 options_for_create.line_of_door_thickness = Line.CreateBound(options_for_create.start_point, end_point)
             else:
-                options_for_create.line_of_door_thickness = Line.CreateBound(start_point, end_point).CreateReversed()
+                options_for_create.line_of_door_thickness = Line.CreateBound(options_for_create.start_point,
+                                                                             end_point).CreateReversed()
         return options_for_create
 
     def get_info_for_specified_line(self, plugin_options):
@@ -757,7 +718,9 @@ class DoorContourFactory:
         if min_dist < float(distance_from_user) <= convert_to_millimeters_from_feet(info_for_create.distance):
             direction = info_for_create.line_of_door_thickness.Direction
             info_for_create.line_of_door_thickness = Line.CreateBound(start_point,
-                                                                      start_point + direction * convert_from_millimeters_to_feet(
+                                                                      start_point +
+                                                                      direction *
+                                                                      convert_from_millimeters_to_feet(
                                                                           distance_from_user))
             return info_for_create
 
@@ -790,7 +753,6 @@ class DoorContourFactory:
         # Формирование виртуального Solid из всех стен (включая стену-основу), присоединенных к основе стены дверного
         # проема
         wall_solid = self.solid_operations.get_solid_from_host_walls(self.door)
-        # room_solid = self.solid_operations.get_room_solid(self.room)
         room_solid = self.room_contour.create_virtual_solid_of_room()
 
         boundary_point_in_door_center = self.get_boundary_point_from_room_in_door_center(room_solid)
