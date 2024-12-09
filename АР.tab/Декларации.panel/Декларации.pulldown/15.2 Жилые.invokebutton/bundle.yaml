@@ -1,0 +1,53 @@
+title:
+  ru: 15.2 Жилые
+  en_us: 15.2 Apartments
+
+tooltip:
+  ru: >-
+    Выгружает декларацию из текущего проекта и из связанных файлов 
+    по жилым помещениям в формате Excel, csv или json.
+    
+    
+    1. В настройках скрипта задайте имя файла декларации, путь и формат.
+    
+    2. Выберите доступные проекты для выгрузки и стадию помещений. 
+    
+    3. Задайте количество знаком после запятой для расчета ПЛОЩАДЕЙ помещений.
+    
+    4. Поставьте галочку "Рассчитывать УТП" при необходимости.     
+    Расчёт УТП возможен только со стандартным набором приоритетов!
+    
+    5. На вкладке "Параметры" необходимо заполнить все параметры из списка. 
+    Дополнительную информацию о каждом параметре можно узнать, 
+    если навести курсор на кнопку "?"
+    
+    6. На вкладке "Приоритеты" можно изменить приоритеты помещений. 
+    Приоритеты влияют на порядок столбцов в декларации и на расчёт УТП.
+
+  en_us: >-
+    Creates a declaration for apartments in Excel, csv or json.
+    
+    
+    1. Set declaration name, path and file format in the settings.
+    
+    2. Select available projects and a phase for rooms.
+    
+    3. Set accuracy for room AREAS calculation.
+    
+    4. Set "Unique trade proposition" checkbox, if needed.
+    
+    5. At "Parameter" tab set all parameters in the list.
+    Check a tooltip at "?" button for more information.
+    
+    5. At "Priorities" you can set the list of priorities.
+    Priorities define the order of rooms in declaration and 
+    settings for UTP calculation.
+
+assembly: RevitDeclarations.dll
+command_class: ApartmentsDeclarationCommand
+
+author: sssenya
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=134087701"
+
+min_revit_version: 2022
+max_revit_version: 2024
