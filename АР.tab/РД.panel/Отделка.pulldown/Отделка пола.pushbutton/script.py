@@ -2,6 +2,8 @@
 
 import clr
 
+# from clr import StrongBox
+
 clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
 
@@ -34,14 +36,14 @@ uidoc = __revit__.ActiveUIDocument
 active_view = doc.ActiveView
 
 
-def convert_to_millimeters(value):
+def convert_from_millimeters_to_feet(value):
     if HOST_APP.is_older_than(2022):
         return UnitUtils.ConvertToInternalUnits(int(value), DisplayUnitType.DUT_MILLIMETERS)
     else:
         return UnitUtils.ConvertToInternalUnits(int(value), UnitTypeId.Millimeters)
 
 
-def convert_from_millimeters(value):
+def convert_to_millimeters_from_feet(value):
     if HOST_APP.is_older_than(2022):
         return UnitUtils.ConvertFromInternalUnits(value, DisplayUnitType.DUT_MILLIMETERS)
     else:
@@ -146,12 +148,13 @@ class RevitRepository:
 
 class PluginConfig:
     def __init__(self, floor_type='', door_contour_option='', door_opening_option='', door_contour_offset='',
-                 level_offset=''):
+                 level_offset='', offset_into_room=''):
         self.__floor_type = floor_type
         self.__door_contour_option = door_contour_option
         self.__door_opening_option = door_opening_option
         self.__door_contour_offset = door_contour_offset
         self.__level_offset = level_offset
+        self.__offset_into_room = offset_into_room
 
     def floor_type(self):
         return self.__floor_type
@@ -167,6 +170,9 @@ class PluginConfig:
 
     def level_offset(self):
         return self.__level_offset
+
+    def offset_into_room(self):
+        return self.__offset_into_room
 
 
 class DoorContourOption:
@@ -190,7 +196,7 @@ class ContourNotCreate(DoorContourOption):
 
 class ContourCreateFullThickness(DoorContourOption):
     def create_contour(self, room, door, plugin_options):
-        door_contour = DoorContourFactory(room, door)
+        door_contour = DoorContourFactory(room, door, plugin_options)
         info_for_create = door_contour.get_info_for_full_thickness(plugin_options)
         return door_contour.create_rectangle_door_curve_loop(info_for_create)
 
@@ -201,7 +207,7 @@ class ContourCreateFullThickness(DoorContourOption):
 
 class ContourCreateToTheMiddle(DoorContourOption):
     def create_contour(self, room, door, plugin_options):
-        door_contour = DoorContourFactory(room, door)
+        door_contour = DoorContourFactory(room, door, plugin_options)
         info_for_create = door_contour.get_info_for_middle(plugin_options)
         return door_contour.create_rectangle_door_curve_loop(info_for_create)
 
@@ -213,7 +219,7 @@ class ContourCreateToTheMiddle(DoorContourOption):
 class ContourCreateForSpecifiedLength(DoorContourOption):
 
     def create_contour(self, room, door, plugin_options):
-        door_contour = DoorContourFactory(room, door)
+        door_contour = DoorContourFactory(room, door, plugin_options)
         if not door_contour.check_door_z_location(plugin_options):
             return None
         info_for_create = door_contour.get_info_for_specified_line(plugin_options)
@@ -346,8 +352,8 @@ class DoorWithPoints:
         смещением 200мм по высоте от низа вставки двери
         return: точка, находящаяся сверху от двери в плане; точка, находящаяся снизу от двери в плане
         '''
-        z_offset = convert_to_millimeters(200)  # смещение по высоте от низа дверного проема, мм
-        top_bottom_offset = convert_to_millimeters(
+        z_offset = convert_from_millimeters_to_feet(1000)  # смещение по высоте от низа дверного проема, мм
+        top_bottom_offset = convert_from_millimeters_to_feet(
             600)  # смещение в плане вперед/назад от центра точки вставки двери,мм
         door_location = DoorContourFactory.get_door_location(self.__door)
         if door_location is None:
@@ -416,6 +422,7 @@ class DoorContourParams:
         self.__is_right = None
         self.__door_width = None
         self.__door_vector = None
+        self.__boundary_point_of_center_room = None
 
     @property
     def start_point(self):
@@ -465,15 +472,32 @@ class DoorContourParams:
     def door_vector(self, value):
         self.__door_vector = value
 
+    @property
+    def boundary_point_of_center_room(self):
+        return self.__boundary_point_of_center_room
+
+    @boundary_point_of_center_room.setter
+    def boundary_point_of_center_room(self, value):
+        self.__boundary_point_of_center_room = value
+
+
+def create_direct_shape(solid):
+    directShape = DirectShape.CreateElement(doc, ElementId(BuiltInCategory.OST_GenericModel))
+
+    # Устанавливаем геометрию для DirectShape
+    directShape.SetShape([solid])
+    return directShape
+
 
 class DoorContourFactory:
-    def __init__(self, room, door):
+    def __init__(self, room, door, plugin_options):
         self.solid_operations = SolidOperations()
         self.room = room
         self.revit_info = RevitRepository(doc)
         self.simplify_line = LineMerging()
-        self.room_contour = RoomWallsContour(self.room)
+        self.room_contour = RoomWallsContour(self.room, plugin_options)
         self.door = door
+        self.plugin_options = plugin_options
 
     def get_boundary_point_from_room_in_door_center(self, room_solid):
         '''
@@ -483,28 +507,23 @@ class DoorContourFactory:
         return: точка, полученная при пересечении линии, запущенной из центра дверного проема и Solid помещения
         '''
         line, is_right = self.create_line_from_door(DirectionEnum.top)
-
         intersect_opt_inside = SolidCurveIntersectionOptions()
         intersect_opt_outside = SolidCurveIntersectionOptions()
         intersect_opt_outside.ResultType = SolidCurveIntersectionMode.CurveSegmentsOutside
         intersect = room_solid.IntersectWithCurve(line, intersect_opt_inside)
-
         if intersect.SegmentCount < 1:
             # Если линия, запущенная вверх не пересекла Solid помещения - создание линии по направлению вниз от проема
             # и повторная проверка на пересечение
             line, is_right = self.create_line_from_door(DirectionEnum.bottom)
             intersect = room_solid.IntersectWithCurve(line, intersect_opt_inside)
-
             if intersect.SegmentCount > 0:
                 # Если линия, запущенная вверх пересекла Solid помещения - замена результата проверки на внешние кривые
                 intersect = room_solid.IntersectWithCurve(line, intersect_opt_outside)
-
         else:
             # Если линия, запущенная вверх пересекла Solid помещения - замена результата проверки на внешние кривые
             intersect = room_solid.IntersectWithCurve(line, intersect_opt_outside)
         line_to_room = intersect.GetCurveSegment(0)
         intersect_coord = line_to_room.GetEndPoint(1)
-
         return intersect_coord
 
     def create_line_from_door(self, direction="right"):
@@ -516,15 +535,15 @@ class DoorContourFactory:
         return: line - линия, созданная из центра дверного проема; is_right - направление линии - True, если линия
         вправо, False - влево, используется также и для режимов "top" и "bottom"
         '''
-        z_offset_const = convert_to_millimeters(200)  # отступ от низа дверного проема, мм
+        z_offset_const = convert_from_millimeters_to_feet(1000)  # отступ от низа дверного проема, мм
         door_location = self.get_door_location(self.door)
         if door_location is None:
             return None
         door_vector = self.get_vector_from_door(self.door)
         normal_vector = XYZ.BasisZ.CrossProduct(door_vector).Normalize()
         dist_const_z = z_offset_const + door_location.Z
-        dist_const_left_right = convert_to_millimeters(6000)  # длина линии, запущенной влево/вправо
-        dist_const_top_bottom = convert_to_millimeters(500)  # длина линии, запущенной вперед/назад
+        dist_const_left_right = convert_from_millimeters_to_feet(6000)  # длина линии, запущенной влево/вправо
+        dist_const_top_bottom = convert_from_millimeters_to_feet(500)  # длина линии, запущенной вперед/назад
         start_point = XYZ(door_location.X, door_location.Y, dist_const_z)
         is_right = True
         end_point = XYZ(door_location.X, door_location.Y, dist_const_z) + normal_vector * dist_const_left_right
@@ -546,7 +565,7 @@ class DoorContourFactory:
         is_right: bool направления создания до этого линии из центра проема (True - вправо, False - влево)
         return: линия, созданная перпендикулярно ширине проема
         '''
-        dist_const = convert_to_millimeters(1000)  # длина линии запускаемой линии в мм
+        dist_const = convert_from_millimeters_to_feet(1000)  # длина линии запускаемой линии в мм
         door_vector = self.get_vector_from_door(self.door)
         start_point = point + door_vector * dist_const
         end_point = point - door_vector * dist_const
@@ -574,16 +593,21 @@ class DoorContourFactory:
         rectangle_width = -info_for_create.door_width
         if info_for_create.is_right:
             alongside_vector = -alongside_vector
-
         end_point = start_point + alongside_vector * abs(rectangle_width)
-
         long_line = Line.CreateBound(start_point, end_point)
 
         second_short_line = Line.CreateBound(long_line.GetEndPoint(1),
                                              short_line.GetEndPoint(0) + alongside_vector * abs(rectangle_width))
 
         second_long_line = Line.CreateBound(second_short_line.GetEndPoint(1), short_line.GetEndPoint(0))
+        center_point_of_second_long_line = second_long_line.Evaluate(0.5, True)
+        translation_vector = info_for_create.boundary_point_of_center_room - center_point_of_second_long_line
+        second_long_line = second_long_line.CreateTransformed(Transform.CreateTranslation(translation_vector))
+        start_moved_point = second_long_line.GetEndPoint(0)
+        end_moved_point = second_long_line.GetEndPoint(1)
 
+        short_line = Line.CreateBound(end_moved_point, short_line.GetEndPoint(1))
+        second_short_line = Line.CreateBound(second_short_line.GetEndPoint(0), start_moved_point)
         # Последовательное создание петли кривых из линий
         res_curve_loop.Append(short_line)
 
@@ -675,7 +699,8 @@ class DoorContourFactory:
             if options_for_create.is_right:
                 options_for_create.line_of_door_thickness = Line.CreateBound(options_for_create.start_point, end_point)
             else:
-                options_for_create.line_of_door_thickness = Line.CreateBound(start_point, end_point).CreateReversed()
+                options_for_create.line_of_door_thickness = Line.CreateBound(options_for_create.start_point,
+                                                                             end_point).CreateReversed()
         return options_for_create
 
     def get_info_for_specified_line(self, plugin_options):
@@ -688,10 +713,12 @@ class DoorContourFactory:
         distance_from_user = plugin_options.door_contour_offset
         start_point = info_for_create.start_point
         min_dist = 1  # мм для минимального расстояния
-        if min_dist < float(distance_from_user) <= convert_from_millimeters(info_for_create.distance):
+        if min_dist < float(distance_from_user) <= convert_to_millimeters_from_feet(info_for_create.distance):
             direction = info_for_create.line_of_door_thickness.Direction
             info_for_create.line_of_door_thickness = Line.CreateBound(start_point,
-                                                                      start_point + direction * convert_to_millimeters(
+                                                                      start_point +
+                                                                      direction *
+                                                                      convert_from_millimeters_to_feet(
                                                                           distance_from_user))
             return info_for_create
 
@@ -700,12 +727,13 @@ class DoorContourFactory:
         Проверка соответствия положения перекрытия и дверного проема по z координате
         '''
         door_location_z = float(self.get_door_location(self.door).Z)
-        room_z_point = float(doc.GetElement(self.room.LevelId).Elevation + convert_to_millimeters(
-            plugin_options.level_offset))
+        room_level_point_z = doc.GetElement(self.room.LevelId).Elevation
+        floor_z_point = float(room_level_point_z + convert_from_millimeters_to_feet(plugin_options.level_offset))
         res = True
-        diff = convert_to_millimeters(1)  # разница между положением низа помещения и двери
-        if abs(door_location_z - room_z_point) > diff:
-            res = False
+        diff = convert_from_millimeters_to_feet(1000)  # разница между положением низа создаваемого перекрытия и двери
+        if door_location_z > floor_z_point:
+            if abs(door_location_z - floor_z_point) > diff:
+                res = False
         return res
 
     def get_base_info_for_door_contour(self):
@@ -720,14 +748,12 @@ class DoorContourFactory:
 
         # Создание линии из центра дверного проема вправо
         first_line, is_right = self.create_line_from_door(DirectionEnum.right)
-
         # Формирование виртуального Solid из всех стен (включая стену-основу), присоединенных к основе стены дверного
         # проема
         wall_solid = self.solid_operations.get_solid_from_host_walls(self.door)
         room_solid = self.room_contour.create_virtual_solid_of_room()
 
         boundary_point_in_door_center = self.get_boundary_point_from_room_in_door_center(room_solid)
-
         # Проверка на пересечение линии, запущенной вправо
         intersect_opt_inside = SolidCurveIntersectionOptions()
         intersect_opt_outside = SolidCurveIntersectionOptions()
@@ -761,13 +787,13 @@ class DoorContourFactory:
 
         info_for_create.door_vector = self.get_vector_from_door(self.door)
         info_for_create.is_right = is_right
-
         info_for_create.start_point = self.get_start_point_for_door_contour(line_of_door_thickness,
                                                                             boundary_point_in_door_center)
 
-        info_for_create.distance = convert_from_millimeters(line_of_door_thickness.Length)
+        info_for_create.distance = convert_to_millimeters_from_feet(line_of_door_thickness.Length)
         info_for_create.line_of_door_thickness = self.check_line_of_door_thickness(line_of_door_thickness,
                                                                                    info_for_create.start_point)
+        info_for_create.boundary_point_of_center_room = boundary_point_in_door_center
 
         return info_for_create
 
@@ -792,6 +818,19 @@ class DoorContourFactory:
     def get_vector_from_door(door):
         door_normal = door.FacingOrientation.Normalize()
         return door_normal
+
+
+def create_test_model_line(geom_line):
+    dir = geom_line.Direction.Normalize()
+    x = dir.X
+    y = dir.Y
+    z = dir.Z
+
+    origin = geom_line.Origin
+    normal = XYZ(z - y, x - z, y - x)
+    plane = Plane.CreateByNormalAndOrigin(normal, origin)
+    sketch = SketchPlane.Create(doc, plane)
+    doc.Create.NewModelCurve(geom_line, sketch)
 
 
 class SimplifyCurves:
@@ -879,9 +918,10 @@ class SimplifyCurves:
 
 
 class RoomWallsContour:
-    def __init__(self, room):
+    def __init__(self, room, plugin_options):
         self.room = room
         self.revit_info = RevitRepository(doc)
+        self.plugin_options = plugin_options
 
     def curve_arrays_into_curve_loops(self, curve_arrays):
         '''
@@ -912,13 +952,36 @@ class RoomWallsContour:
         return: Виртуальный Solid помещения
         '''
         curve_loops = self.get_curve_loops_of_room_by_walls()
+        room_height = self.room.UnboundedHeight
         new_curve_loops = []
         for curve_loop in curve_loops:
-            new_curve_loop = curve_loop.CreateViaOffset(curve_loop, convert_to_millimeters(offset), XYZ(0, 0, 1))
+            new_curve_loop = curve_loop.CreateViaOffset(curve_loop, convert_from_millimeters_to_feet(offset),
+                                                        XYZ(0, 0, 1))
             new_curve_loops.append(new_curve_loop)
 
-        virtual_solid = GeometryCreationUtilities.CreateExtrusionGeometry(new_curve_loops, XYZ(0, 0, 1), 10)
+        virtual_solid = GeometryCreationUtilities.CreateExtrusionGeometry(new_curve_loops, XYZ(0, 0, 1), room_height)
         return virtual_solid
+
+    def correct_z_point_to_curve(self, curve):
+        room_z_offset = self.room.BaseOffset
+        room_level_elevation = doc.GetElement(self.room.LevelId).Elevation
+        room_z_point = room_z_offset + room_level_elevation
+        if isinstance(curve, Line):
+            # Обработка линии
+            start_point = curve.GetEndPoint(0)
+            end_point = curve.GetEndPoint(1)
+            new_start_point = XYZ(start_point.X, start_point.Y, room_z_point)
+            new_end_point = XYZ(end_point.X, end_point.Y, room_z_point)
+            return Line.CreateBound(new_start_point, new_end_point)
+
+        elif isinstance(curve, Arc):
+            # Обработка дуги
+            center = curve.Center
+            radius = curve.Radius
+            start_angle = curve.GetEndParameter(0)
+            end_angle = curve.GetEndParameter(1)
+            new_center = XYZ(center.X, center.Y, room_z_point)
+            return Arc.Create(new_center, radius, start_angle, end_angle, curve.GetEndPoint(0), curve.GetEndPoint(1))
 
     def get_curve_loops_of_room_by_walls(self):
         '''
@@ -930,12 +993,31 @@ class RoomWallsContour:
         for loop in loops:
             curves = []
             for curve in loop:
-                curves.append(curve.GetCurve())
+                old_curve = curve.GetCurve()
+                new_correct_curve = self.correct_z_point_to_curve(old_curve)
+                curves.append(new_correct_curve)
             curve_loops.append(SimplifyCurves(curves).simplified_curves())
+        curve_loops_with_offset = []
+        inward_offset = convert_from_millimeters_to_feet(self.plugin_options.offset_into_room)
+        for curve_loop in curve_loops:
+            curve_loop_with_offset = self.create_curve_loop_offset_inward(curve_loop, inward_offset)
+            curve_loops_with_offset.append(curve_loop_with_offset)
         if HOST_APP.is_newer_than(2021):
-            return curve_loops
+            return curve_loops_with_offset
         else:
-            return self.curve_arrays_into_curve_loops(curve_loops)
+            return self.curve_arrays_into_curve_loops(curve_loops_with_offset)
+
+    def create_curve_loop_offset_inward(self, curve_loop, offset_distance):
+        plane = curve_loop.GetPlane()
+        normal = plane.Normal  # Нормаль плоскости границ помещения
+
+        if not curve_loop.IsCounterclockwise(normal):
+            # Если ориентация по часовой стрелке, инвертируем нормаль
+            normal = -normal
+        inward_offset_distance = -offset_distance
+
+        offset_curve_loop = CurveLoop.CreateViaOffset(curve_loop, inward_offset_distance, normal)
+        return offset_curve_loop
 
     def get_z_from_curve_loops(self, curve_loops):
         for curve_loop in curve_loops:
@@ -970,7 +1052,7 @@ class RoomFloorContour:
         self.room = room
         self.revit_info = RevitRepository(doc)
         self.plugin_options = plugin_options
-        self.room_contour = RoomWallsContour(self.room)
+        self.room_contour = RoomWallsContour(self.room, plugin_options)
 
     def get_curve_arrays_with_doors(self):
         '''
@@ -1106,7 +1188,7 @@ class CreateFloorsByRooms:
             level_id = room.LevelId
             current_floor = Floor.Create(doc, curves, floor_type.Id, level_id)
 
-        converted_level_offset = convert_to_millimeters(level_offset)
+        converted_level_offset = convert_from_millimeters_to_feet(level_offset)
         current_floor.SetParamValue(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM, converted_level_offset)
         room_boundary_param = current_floor.get_Parameter(BuiltInParameter.WALL_ATTR_ROOM_BOUNDING)
         room_boundary_param.Set(False)
@@ -1180,10 +1262,11 @@ class CreateFloorsByRoomsCommand(ICommand):
         self.OnCanExecuteChanged()
 
     def CanExecute(self, parameter):
-        if not is_int(self.__view_model.level_offset) or not is_int(self.__view_model.door_contour_offset):
+        if not is_int(self.__view_model.level_offset) or not is_int(
+                self.__view_model.door_contour_offset) or not is_int(self.__view_model.offset_into_room):
             self.__view_model.error_text = "Введите целое число"
             return False
-        if int(self.__view_model.door_contour_offset) < 0:
+        if int(self.__view_model.door_contour_offset) < 0 or int(self.__view_model.offset_into_room) < 0:
             self.__view_model.error_text = "Смещение должно быть положительным числом"
             return False
         self.__view_model.error_text = None
@@ -1252,16 +1335,17 @@ class MainWindowViewModel(Reactive):
         self.__is_enabled_door_contour_offset = False
         self.__door_openings = [DoorOpeningInAnyDirection(), DoorOpeningInside(), DoorOpeningOutside()]
         self.__selected_door_opening = self.__door_openings[0]
+        self.__offset_into_room = "0"
 
     @property
     def floor_types(self):
         return self.__floor_types
 
-    @property
+    @reactive
     def rooms_on_active_view(self):
         return self.__rooms_on_active_view
 
-    @property
+    @reactive
     def selected_door_opening(self):
         return self.__selected_door_opening
 
@@ -1269,11 +1353,11 @@ class MainWindowViewModel(Reactive):
     def selected_door_opening(self, value):
         self.__selected_door_opening = value
 
-    @property
+    @reactive
     def create_floors_by_rooms(self):
         return self.__create_floors_by_rooms
 
-    @property
+    @reactive
     def selected_floor_type(self):
         return self.__selected_floor_type
 
@@ -1281,7 +1365,7 @@ class MainWindowViewModel(Reactive):
     def selected_floor_type(self, value):
         self.__selected_floor_type = value
 
-    @property
+    @reactive
     def level_offset(self):
         return self.__level_offset
 
@@ -1289,7 +1373,15 @@ class MainWindowViewModel(Reactive):
     def level_offset(self, value):
         self.__level_offset = value
 
-    @property
+    @reactive
+    def offset_into_room(self):
+        return self.__offset_into_room
+
+    @offset_into_room.setter
+    def offset_into_room(self, value):
+        self.__offset_into_room = value
+
+    @reactive
     def is_checked_selected(self):
         return self.__is_checked_selected
 
@@ -1297,7 +1389,7 @@ class MainWindowViewModel(Reactive):
     def is_checked_selected(self, value):
         self.__is_checked_selected = value
 
-    @property
+    @reactive
     def is_checked_select(self):
         return self.__is_checked_select
 
@@ -1305,7 +1397,7 @@ class MainWindowViewModel(Reactive):
     def is_checked_select(self, value):
         self.__is_checked_select = value
 
-    @property
+    @reactive
     def is_checked_on_view(self):
         return self.__is_checked_on_view
 
@@ -1313,15 +1405,15 @@ class MainWindowViewModel(Reactive):
     def is_checked_on_view(self, value):
         self.__is_checked_on_view = value
 
-    @property
+    @reactive
     def is_already_enabled(self):
         return self.__is_already_enabled
 
-    @property
+    @reactive
     def selected_rooms(self):
         return self.__selected_rooms
 
-    @property
+    @reactive
     def error_text(self):
         return self.__error_text
 
@@ -1329,11 +1421,11 @@ class MainWindowViewModel(Reactive):
     def error_text(self, value):
         self.__error_text = value
 
-    @property
+    @reactive
     def doors_contours_options(self):
         return self.__doors_contours_options
 
-    @property
+    @reactive
     def selected_door_contour_option(self):
         return self.__selected_door_contour_option
 
@@ -1345,7 +1437,7 @@ class MainWindowViewModel(Reactive):
             self.is_enabled_door_contour_offset = False
         self.__selected_door_contour_option = value
 
-    @property
+    @reactive
     def door_contour_offset(self):
         return self.__door_contour_offset
 
@@ -1353,7 +1445,7 @@ class MainWindowViewModel(Reactive):
     def door_contour_offset(self, value):
         self.__door_contour_offset = value
 
-    @property
+    @reactive
     def is_enabled_door_contour_offset(self):
         return self.__is_enabled_door_contour_offset
 
@@ -1374,6 +1466,7 @@ class MainWindowViewModel(Reactive):
         plugin_config.door_contour_option = self.__selected_door_contour_option
         plugin_config.door_contour_offset = self.__door_contour_offset
         plugin_config.door_opening_option = self.__selected_door_opening
+        plugin_config.offset_into_room = self.__offset_into_room
         return plugin_config
 
 
