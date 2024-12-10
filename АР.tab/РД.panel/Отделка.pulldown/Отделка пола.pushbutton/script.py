@@ -352,7 +352,7 @@ class DoorWithPoints:
         смещением 200мм по высоте от низа вставки двери
         return: точка, находящаяся сверху от двери в плане; точка, находящаяся снизу от двери в плане
         '''
-        z_offset = convert_from_millimeters_to_feet(200)  # смещение по высоте от низа дверного проема, мм
+        z_offset = convert_from_millimeters_to_feet(1000)  # смещение по высоте от низа дверного проема, мм
         top_bottom_offset = convert_from_millimeters_to_feet(
             600)  # смещение в плане вперед/назад от центра точки вставки двери,мм
         door_location = DoorContourFactory.get_door_location(self.__door)
@@ -535,7 +535,7 @@ class DoorContourFactory:
         return: line - линия, созданная из центра дверного проема; is_right - направление линии - True, если линия
         вправо, False - влево, используется также и для режимов "top" и "bottom"
         '''
-        z_offset_const = convert_from_millimeters_to_feet(200)  # отступ от низа дверного проема, мм
+        z_offset_const = convert_from_millimeters_to_feet(1000)  # отступ от низа дверного проема, мм
         door_location = self.get_door_location(self.door)
         if door_location is None:
             return None
@@ -593,7 +593,6 @@ class DoorContourFactory:
         rectangle_width = -info_for_create.door_width
         if info_for_create.is_right:
             alongside_vector = -alongside_vector
-
         end_point = start_point + alongside_vector * abs(rectangle_width)
         long_line = Line.CreateBound(start_point, end_point)
 
@@ -609,7 +608,6 @@ class DoorContourFactory:
 
         short_line = Line.CreateBound(end_moved_point, short_line.GetEndPoint(1))
         second_short_line = Line.CreateBound(second_short_line.GetEndPoint(0), start_moved_point)
-
         # Последовательное создание петли кривых из линий
         res_curve_loop.Append(short_line)
 
@@ -732,7 +730,7 @@ class DoorContourFactory:
         room_level_point_z = doc.GetElement(self.room.LevelId).Elevation
         floor_z_point = float(room_level_point_z + convert_from_millimeters_to_feet(plugin_options.level_offset))
         res = True
-        diff = convert_from_millimeters_to_feet(300)  # разница между положением низа создаваемого перекрытия и двери
+        diff = convert_from_millimeters_to_feet(1000)  # разница между положением низа создаваемого перекрытия и двери
         if door_location_z > floor_z_point:
             if abs(door_location_z - floor_z_point) > diff:
                 res = False
