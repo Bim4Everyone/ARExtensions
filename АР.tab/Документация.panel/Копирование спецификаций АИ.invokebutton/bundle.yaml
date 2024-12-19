@@ -1,0 +1,19 @@
+title:
+  ru: Копирование спецификаций АИ
+  en_us: Копирование спецификаций АИ
+
+tooltip:
+  ru: >- 
+    Плагин предназначен для копирования спецификаций АИ. 
+    Для копирования выберите спецификации для копирования, запустите плагин, укажите конфигурации и нажмите Ок.
+  en_us: >- 
+    The plugin is designed to copy interior specifications. To copy, select the specifications for copy, run the plugin, 
+    specify the configurations and click OK.
+
+assembly: RevitCopyInteriorSpecs.dll
+command_class: RevitCopyInteriorSpecsCommand
+
+author: DivinN
+
+min_revit_version: 2022
+max_revit_version: 2024
