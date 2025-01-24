@@ -5,9 +5,9 @@ title:
 tooltip:
   ru: >- 
     Плагин предназначен для копирования спецификаций АИ. 
-    Для копирования выберите спецификации для копирования, запустите плагин, укажите конфигурации и нажмите Ок.
+    Для работы выберите спецификации для копирования, запустите плагин, укажите конфигурации и нажмите Ок.
   en_us: >- 
-    The plugin is designed to copy interior specifications. To copy, select the specifications for copy, run the plugin, 
+    The plugin is designed to copy interior specifications. To work, select the specifications for copy, run the plugin, 
     specify the configurations and click OK.
 
 assembly: RevitCopyInteriorSpecs.dll
