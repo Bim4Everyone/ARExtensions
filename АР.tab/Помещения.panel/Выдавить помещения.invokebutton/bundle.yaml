@@ -1,0 +1,40 @@
+title:
+  ru: "Выдавить\nпомещения"
+  en_us: "Room\nextrusion"
+
+tooltip:
+  ru: >-     
+    Плагин создает загружаемые семейства категории "Дорожки" с выдавливанием выбранных помещений и загружает его в проект.
+    
+    
+    1. Выделите все помещения, которые нужно выдавить
+    
+    2. Запустите плагин
+    
+    3. Задайте имя семейства. Например, если вы выдавливаете машино-места, впишите "Машино-места", если проезды и проходы - "Проезды и проходы"
+    
+    4. Введите высоту выдавливания от уровня чистого пола
+    
+    5. Нажмите кнопку "Выдавить"
+    
+  en_us: >-     
+    The plugin creates downloadable families of the "Paths" category with extrusion of the selected rooms and loads it into the project.
+    
+    
+    1. Select all the rooms that need to be extruded
+    
+    2. Launch the plugin
+    
+    3. Specify a family name. For example, if you are extruding parking spaces, enter “Parking spaces”, if driveways and aisles - “Driveways and aisles”
+    
+    4. Enter the extrusion height from the finished floor level
+    
+    5. Press the "Extrude" button
+
+assembly: RevitRoomExtrusion.dll
+command_class: RevitRoomExtrusionCommand
+
+author: KozlovPS
+
+min_revit_version: 2022
+max_revit_version: 2024
