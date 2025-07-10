@@ -727,7 +727,7 @@ class DoorContourFactory:
         Проверка соответствия положения перекрытия и дверного проема по z координате
         '''
         door_location_z = float(self.get_door_location(self.door).Z)
-        room_level_point_z = doc.GetElement(self.room.LevelId).Elevation
+        room_level_point_z = doc.GetElement(self.room.LevelId).ProjectElevation
         floor_z_point = float(room_level_point_z + convert_from_millimeters_to_feet(plugin_options.level_offset))
         res = True
         diff = convert_from_millimeters_to_feet(1000)  # разница между положением низа создаваемого перекрытия и двери
