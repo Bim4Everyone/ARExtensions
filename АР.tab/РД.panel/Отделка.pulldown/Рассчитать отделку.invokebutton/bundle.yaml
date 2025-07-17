@@ -1,17 +1,38 @@
 title:
   ru: Рассчитать отделку
-  en_us: Рассчитать отделку
+  en_us: Calculate finishing
 
 tooltip:
   ru: >- 
-    Please Write Description
+    Рассчитывает отделку - заполняет параметры семейств отделки (стены, потолки, полы, плинтусы) 
+    на основе параметров помещений. Скрипт сопоставляет помещения и отделку за счет пересечения элементов. 
+    Для расчета у помещений необходимо заполнить ключевой параметр отделки.
+    
+    
+    1. Запустите скрипт.
+    
+    2. Выберите и стадию и нужные помещения по трем доступным параметрам. 
+    Помещения можно фильтровать по одному параметру или по нескольким.
+    
+    3. Нажмите "ОК" и скрипт произведет расчет. 
+
   en_us: >- 
-    Please Write Description
+    Calculates finishing - set parameter values for finishing families (walls, floors, ceilings, baseboards)
+    by room parameters. This script finds finishing for every rooms by intersection.
+    You should set key finishing parameter for rooms before running the script.
+
+
+    1. Run the script.
+    
+    2. Set a phase and filter rooms by available parameters.
+    
+    3. Press "OK" for starting calculation. 
 
 assembly: RevitFinishing.dll
 command_class: RevitFinishingCommand
 
 author: sssenya
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=134086800"
 
 min_revit_version: 2022
 max_revit_version: 2024
