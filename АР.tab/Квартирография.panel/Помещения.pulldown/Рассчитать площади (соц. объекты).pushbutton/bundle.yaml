@@ -1,0 +1,29 @@
+﻿title:
+  ru: Рассчитать площади (соц. объекты)
+  en_us: Calculate Areas (Social Facilities)
+
+tooltip:
+  ru: >-
+    Плагин округляет площади в проектах социального назначения во избежание несоответствий в суммарной площади
+    
+    1. Выберите стадию, на которой созданы помещения
+    2. Выберите параметр для чтения (с которого будет считана площадь)
+    3. Выберите параметр для записи (в который будет записана округленная площадь)
+    4. Выберите количество знаков после запятой, до которого будет округлена площадь
+    
+  en_us:  >-
+    The plugin rounds off areas in social projects to avoid discrepancies in the total area 
+    
+    1. Select the phase in which the rooms were created
+    2. Select the parameter to read (from which the area will be read)
+    3. Select the parameter to write (to which the rounded area will be written)
+    4. Select the number of decimal places to which the area will be rounded
+
+assembly: RevitRoundingOfAreas.dll
+command_class: RevitRoundingOfAreasCommand
+
+author: KozlovPS
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=67841778"
+
+min_revit_version: 2022
+max_revit_version: 2024
