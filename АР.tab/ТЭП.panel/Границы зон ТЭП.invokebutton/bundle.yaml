@@ -1,0 +1,30 @@
+title:
+  ru: Границы зон ТЭП
+  en_us: Area boundaries 
+
+tooltip:
+  ru: >-
+    Плагин строит границы зон, автоматически определяя внешние границы здания, всю пластику фасадов: выступающие элементы, 
+    ограждения, окна, витражи. Всё что будет пересекать плоскость на заданной высоте.
+    
+    1. Выбрать алгоритм построения, высоту плоскости, на которой будет строиться граница зоны.
+    2. Выбрать планы зонирования, на которых будет строиться границы зон.
+    3. Выбрать те элементы, которые могут быть частью границы зоны.
+    4. Нажать кнопку "Построить".
+  en_us: >-
+    The plugin creates area boundaries by automatically detecting the building's outer perimeter and all facade features,
+    including protruding elements, railings, windows, curtain walls, and any other elements intersecting the horizontal
+    plane at the specified elevation.
+
+    1. Select the boundary generation algorithm and specify the elevation of the plane where the area boundary will be created.
+    2. Select the area plan views where the boundaries should be generated.
+    3. Select the elements that can be used as part of the area boundary.
+    4. Click "Build".
+
+assembly: RevitAreaBoundaries.dll
+command_class: RevitAreaBoundariesCommand
+
+author: KozlovPS
+
+min_revit_version: 2022
+max_revit_version: 2024
