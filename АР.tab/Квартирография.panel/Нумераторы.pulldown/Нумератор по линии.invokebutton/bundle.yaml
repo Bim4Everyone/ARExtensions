@@ -1,0 +1,51 @@
+title:
+  ru: >-
+    Нумератор
+    
+    по линии
+  en_us: >-
+    Numbering
+    
+    by line
+
+tooltip:
+  ru: >-  
+    Плагин нумерует выбранные помещения вдоль нарисованного на виде сплайна/линии. Начало сплайна - начало нумерации.     
+    
+    1. Запустите плагин
+    
+    2. Выберите диапазон обработки помещений "Все элементы", "Видимые на виде" или "Выделенные".
+    
+    3. Выберите помещения из списка, при необходимости отфильтруйте нужные помещения по параметру.
+    
+    5. Нажмите кнопку "Выбрать линии в модели", выберите линии на плане этажа.
+    
+    6. При необходимости отсортируйте последовательность линий нумерации.
+    
+    7. Проверьте параметры на странице "Настройки параметров"
+    
+    8. Запустите плагин.
+    
+  en_us: >-
+    
+    The plugin numbers selected rooms along a spline or line drawn in the view. Numbering starts at the beginning of the spline.
+    
+    1. Launch the plugin.
+    
+    2. Select the room processing scope: "All Elements", "Visible in View", or "Selected Elements".
+    
+    3. Select rooms from the list. If necessary, filter the rooms by parameter.
+    
+    4. Click the "Select Lines in Model" button and select the lines on the floor plan.
+    
+    5. Rearrange the numbering lines in the desired order if necessary.
+    
+    6. Check the parameters on the "Parameter Settings" page.
+    
+    7. Run the plugin.
+
+author: KozlovPS
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=67841778"
+
+min_revit_version: 2022
+max_revit_version: 2024
